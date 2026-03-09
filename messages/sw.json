@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "Viva Brightlife Microfinance",
+    "admin": "Usimamizi wa Admin"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "mikopo_binafsi": "Mikopo Binafsi",
+    "mikopo_wafanyabiashara": "Mikopo kwa Wafanyabiashara",
+    "mikopo_watumishi": "Mikopo ya Watumishi",
+    "mikopo_electronics": "Mikopo Electronics",
+    "mikopo_kilimo": "Mikopo ya Kilimo",
+    "huduma_bima": "Huduma za Bima",
+    "mikopo_vikundi_wakinamama": "Mikopo ya Vikundi vya Wakina Mama",
+    "mikopo_vyombo_moto": "Mikopo ya Vyombo vya Moto",
+    "ripoti": "Ripoti"
+  },
+  "table": {
+    "number": "Namba",
+    "member_number": "Namba ya Mwanachama",
+    "member_name": "Jina la Mwanachama",
+    "cycle": "Cycle",
+    "security_amount": "Kiasi cha Akiba",
+    "loan_number": "Namba ya Mkopo",
+    "disbursement_amount": "Kiasi Kilichotolewa",
+    "disbursement_date": "Tarehe ya Kutolewa",
+    "weekly_installment": "Lejesho la Wikiwiki",
+    "monthly_installment": "Marejesho ya Mwezi",
+    "amount_withdrawn": "Kiasi Alichoondoka Nacho",
+    "os_balance": "OS Balance",
+    "overdue_od": "Overdue OD",
+    "status": "Hali",
+    "actions": "Vitendo"
+  },
+  "buttons": {
+    "add_new": "Ongeza Mpya",
+    "edit": "Hariri",
+    "delete": "Futa",
+    "save": "Hifadhi",
+    "cancel": "Ghairi",
+    "print": "Chapisha",
+    "export": "Hamisha",
+    "search": "Tafuta",
+    "logout": "Toka",
+    "view": "Angalia",
+    "apply_filters": "Weka Filters"
+  },
+  "dashboard": {
+    "total_active_loans": "Jumla ya Mikopo Hai",
+    "total_disbursed_month": "Jumla Iliyotolewa Mwezi Huu",
+    "total_collections": "Jumla ya Makusanyo",
+    "overdue_loans": "Mikopo Iliyochelewa",
+    "active_members": "Wanachama Hai",
+    "active_groups": "Vikundi Hai"
+  },
+  "loan": {
+    "search_placeholder": "Tafuta kwa jina la mwanachama au namba ya mkopo",
+    "status_active": "Active",
+    "status_closed": "Closed",
+    "status_defaulted": "Defaulted",
+    "status_pending": "Pending"
+  },
+  "reports": {
+    "title": "Ripoti na Uchapishaji",
+    "monthly_collection": "Ripoti ya Makusanyo ya Mwezi",
+    "disbursement": "Ripoti ya Utoaji",
+    "overdue": "Ripoti ya Overdue",
+    "member_statement": "Taarifa ya Mwanachama",
+    "group_performance": "Ripoti ya Utendaji wa Kikundi",
+    "loan_type": "Aina ya Mkopo",
+    "date_start": "Tarehe ya Kuanza",
+    "date_end": "Tarehe ya Mwisho"
+  },
+  "common": {
+    "language": "Lugha",
+    "theme": "Mandhari",
+    "profile": "Wasifu"
+  }
+}

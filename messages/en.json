@@ -1,0 +1,79 @@
+{
+  "app": {
+    "name": "Viva Brightlife Microfinance",
+    "admin": "Admin Management"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "mikopo_binafsi": "Individual Loans",
+    "mikopo_wafanyabiashara": "Business Loans",
+    "mikopo_watumishi": "Employee Loans",
+    "mikopo_electronics": "Electronics Loans",
+    "mikopo_kilimo": "Agriculture Loans",
+    "huduma_bima": "Insurance Services",
+    "mikopo_vikundi_wakinamama": "Women's Group Loans",
+    "mikopo_vyombo_moto": "Vehicle Loans",
+    "ripoti": "Reports"
+  },
+  "table": {
+    "number": "Number",
+    "member_number": "Member Number",
+    "member_name": "Member Name",
+    "cycle": "Cycle",
+    "security_amount": "Security Amount (Akiba)",
+    "loan_number": "Loan Number",
+    "disbursement_amount": "Disbursement Amount",
+    "disbursement_date": "Disbursement Date",
+    "weekly_installment": "Weekly Installment",
+    "monthly_installment": "Monthly Installment",
+    "amount_withdrawn": "Amount Withdrawn",
+    "os_balance": "OS Balance",
+    "overdue_od": "Overdue OD",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "buttons": {
+    "add_new": "Add New",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "print": "Print",
+    "export": "Export",
+    "search": "Search",
+    "logout": "Logout",
+    "view": "View",
+    "apply_filters": "Apply Filters"
+  },
+  "dashboard": {
+    "total_active_loans": "Total Active Loans",
+    "total_disbursed_month": "Total Disbursed This Month",
+    "total_collections": "Total Collections",
+    "overdue_loans": "Overdue Loans",
+    "active_members": "Active Members",
+    "active_groups": "Active Groups"
+  },
+  "loan": {
+    "search_placeholder": "Search by member name or loan number",
+    "status_active": "Active",
+    "status_closed": "Closed",
+    "status_defaulted": "Defaulted",
+    "status_pending": "Pending"
+  },
+  "reports": {
+    "title": "Ripoti & Printing",
+    "monthly_collection": "Monthly Collection Report",
+    "disbursement": "Disbursement Report",
+    "overdue": "Overdue Report",
+    "member_statement": "Member Statement",
+    "group_performance": "Group Performance Report",
+    "loan_type": "Loan Type",
+    "date_start": "Start Date",
+    "date_end": "End Date"
+  },
+  "common": {
+    "language": "Language",
+    "theme": "Theme",
+    "profile": "Profile"
+  }
+}
