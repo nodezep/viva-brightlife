@@ -56,7 +56,7 @@ export function LoanSchedulesDialog({loanId, onClose}: Props) {
     ));
     
     startTransition(async () => {
-      const result = await updateScheduleStatusAction(scheduleId, newStatus, paidAmount);
+      const result = await updateScheduleStatusAction(scheduleId, newStatus);
       if (result.error) {
         // Revert on error
         void fetchSchedules();

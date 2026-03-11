@@ -192,12 +192,13 @@ export async function getMarejeshoReportRows(): Promise<MarejeshoRow[]> {
 
 export async function getDashboardMetrics() {
   const supabase = createClient();
+  const today = new Date().toISOString().slice(0, 10);
 
   const [
     {count: activeLoans},
     {data: disbursedRows},
-    {data: repaymentRows},
-    {count: overdueLoans},
+    {data: schedulePaidRows},
+    {data: overdueScheduleRows},
     {count: members},
     {count: groups}
   ] = await Promise.all([
@@ -214,11 +215,11 @@ export async function getDashboardMetrics() {
           .toISOString()
           .slice(0, 10)
       ),
-    supabase.from('repayments').select('amount'),
+    supabase.from('loan_schedules').select('paid_amount'),
     supabase
-      .from('loans')
-      .select('*', {count: 'exact', head: true})
-      .gt('overdue_amount', 0),
+      .from('loan_schedules')
+      .select('loan_id, expected_amount, paid_amount, expected_date')
+      .lt('expected_date', today),
     supabase.from('members').select('*', {count: 'exact', head: true}),
     supabase.from('groups').select('*', {count: 'exact', head: true})
   ]);
@@ -228,16 +229,25 @@ export async function getDashboardMetrics() {
     0
   );
 
-  const totalCollections = (repaymentRows ?? []).reduce(
-    (sum, row) => sum + Number(row.amount ?? 0),
+  const totalCollections = (schedulePaidRows ?? []).reduce(
+    (sum, row) => sum + Number(row.paid_amount ?? 0),
     0
   );
+
+  const overdueLoanIds = new Set<string>();
+  (overdueScheduleRows ?? []).forEach((row) => {
+    const expected = Number(row.expected_amount ?? 0);
+    const paid = Number(row.paid_amount ?? 0);
+    if (paid < expected) {
+      overdueLoanIds.add(row.loan_id);
+    }
+  });
 
   return {
     totalActiveLoans: activeLoans ?? 0,
     totalDisbursedThisMonth,
     totalCollections,
-    overdueLoans: overdueLoans ?? 0,
+    overdueLoans: overdueLoanIds.size,
     activeMembers: members ?? 0,
     activeGroups: groups ?? 0
   };

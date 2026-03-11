@@ -157,7 +157,7 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
                   <th className="px-3 py-2">#</th>
                   <th className="px-3 py-2">Member Number</th>
                   <th className="px-3 py-2">Member Name</th>
-                  <th className="px-3 py-2">Phone</th>
+                  <th className="px-3 py-2 hidden md:table-cell">Phone</th>
                   <th className="px-3 py-2">Role</th>
                   <th className="px-3 py-2">Actions</th>
                 </tr>
@@ -168,7 +168,7 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
                     <td className="px-3 py-2">{index + 1}</td>
                     <td className="px-3 py-2">{member.memberNumber}</td>
                     <td className="px-3 py-2">{member.fullName}</td>
-                    <td className="px-3 py-2">{member.phone ?? '-'}</td>
+                    <td className="px-3 py-2 hidden md:table-cell">{member.phone ?? '-'}</td>
                     <td className="px-3 py-2">{member.roleInGroup ?? 'Member'}</td>
                     <td className="px-3 py-2">
                       <button

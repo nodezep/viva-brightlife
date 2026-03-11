@@ -109,16 +109,16 @@ export function LoanTable({loanType, rows, count}: Props) {
               <th className="px-3 py-2">{t('table.number')}</th>
               <th className="px-3 py-2">{t('table.member_number')}</th>
               <th className="px-3 py-2">{t('table.member_name')}</th>
-              <th className="px-3 py-2">{t('table.cycle')}</th>
-              <th className="px-3 py-2">{t('table.security_amount')}</th>
+              <th className="px-3 py-2 hidden lg:table-cell">{t('table.cycle')}</th>
+              <th className="px-3 py-2 hidden lg:table-cell">{t('table.security_amount')}</th>
               <th className="px-3 py-2">{t('table.loan_number')}</th>
               <th className="px-3 py-2">{t('table.disbursement_amount')}</th>
-              <th className="px-3 py-2">{t('table.disbursement_date')}</th>
-              <th className="px-3 py-2">{t('table.installment_size')}</th>
+              <th className="px-3 py-2 hidden md:table-cell">{t('table.disbursement_date')}</th>
+              <th className="px-3 py-2 hidden lg:table-cell">{t('table.installment_size')}</th>
               <th className="px-3 py-2">{t('table.os_balance')}</th>
-              <th className="px-3 py-2">{t('table.overdue_od')}</th>
+              <th className="px-3 py-2 hidden md:table-cell">{t('table.overdue_od')}</th>
               <th className="px-3 py-2">MAREJESHO</th>
-              <th className="px-3 py-2">{t('table.status')}</th>
+              <th className="px-3 py-2 hidden md:table-cell">{t('table.status')}</th>
               <th className="px-3 py-2 no-print">{t('table.actions')}</th>
             </tr>
           </thead>
@@ -128,14 +128,14 @@ export function LoanTable({loanType, rows, count}: Props) {
                 <td className="px-3 py-2">{index + 1}</td>
                 <td className="px-3 py-2">{row.memberNumber}</td>
                 <td className="px-3 py-2">{row.memberName}</td>
-                <td className="px-3 py-2">{row.cycle}</td>
-                <td className="px-3 py-2">{currency.format(row.securityAmount)}</td>
+                <td className="px-3 py-2 hidden lg:table-cell">{row.cycle}</td>
+                <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.securityAmount)}</td>
                 <td className="px-3 py-2">{row.loanNumber}</td>
                 <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
-                <td className="px-3 py-2">{row.disbursementDate}</td>
-                <td className="px-3 py-2">{currency.format(row.installmentSize)}</td>
+                <td className="px-3 py-2 hidden md:table-cell">{row.disbursementDate}</td>
+                <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.installmentSize)}</td>
                 <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
-                <td className="px-3 py-2">{currency.format(row.overdueAmount)}</td>
+                <td className="px-3 py-2 hidden md:table-cell">{currency.format(row.overdueAmount)}</td>
                 <td className="px-3 py-2">
                   <button 
                     className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
@@ -144,7 +144,7 @@ export function LoanTable({loanType, rows, count}: Props) {
                     <CalendarDays size={12} /> Marejesho
                   </button>
                 </td>
-                <td className="px-3 py-2 capitalize">{row.status}</td>
+                <td className="px-3 py-2 hidden md:table-cell capitalize">{row.status}</td>
                 <td className="px-3 py-2 no-print">
                   <div className="flex gap-1">
                     <button

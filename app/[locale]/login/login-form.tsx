@@ -39,39 +39,61 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="w-full max-w-md space-y-4 rounded-2xl border bg-card p-6">
-      <div>
-        <h1 className="text-xl font-semibold">Admin Login</h1>
-        <p className="text-sm text-muted-foreground">Sign in to manage microfinance operations.</p>
+    <form
+      onSubmit={onSubmit}
+      className="w-full max-w-sm space-y-4 rounded-3xl border border-white/60 bg-white/80 p-5 shadow-2xl backdrop-blur sm:max-w-md sm:space-y-5 sm:p-7"
+    >
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-[0.25em] text-[#5b7385]">Admin Access</p>
+        <h1 className="text-xl font-semibold text-[#123248] font-[family:Georgia,serif] sm:text-2xl">
+          Sign in to your workspace
+        </h1>
+        <p className="text-sm text-[#5d6f7f]">
+          Enter your credentials to manage loans, groups, and repayment schedules.
+        </p>
       </div>
-      <label className="block space-y-1">
-        <span className="text-sm">Email</span>
+
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-[#324a5a]">Email</span>
         <input
           type="email"
           required
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-[#d8e2ea] bg-white/70 px-4 py-3 text-sm text-[#1d2f3b] shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          placeholder="you@viva.co.tz"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
       </label>
-      <label className="block space-y-1">
-        <span className="text-sm">Password</span>
+
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-[#324a5a]">Password</span>
         <input
           type="password"
           required
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="w-full rounded-xl border border-[#d8e2ea] bg-white/70 px-4 py-3 text-sm text-[#1d2f3b] shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          placeholder="Enter your password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
       </label>
-      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+
+      {error ? (
+        <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 hover:shadow-primary/30 disabled:opacity-60"
       >
         {loading ? 'Signing in...' : 'Login'}
       </button>
+
+      <p className="text-center text-xs text-[#6a7d8d]">
+        Need help? Contact your system administrator.
+      </p>
     </form>
   );
 }

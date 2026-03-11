@@ -18,11 +18,11 @@ export async function getLoanSchedulesAction(loanId: string) {
   return data;
 }
 
-export async function updateScheduleStatusAction(scheduleId: string, status: string, paidAmount: number) {
+export async function updateScheduleStatusAction(scheduleId: string, status: string) {
   const supabase = createClient();
   const {data: existing, error: fetchError} = await supabase
     .from('loan_schedules')
-    .select('loan_id, paid_amount')
+    .select('loan_id, paid_amount, expected_amount')
     .eq('id', scheduleId)
     .single();
 
@@ -30,9 +30,11 @@ export async function updateScheduleStatusAction(scheduleId: string, status: str
     return { error: fetchError?.message || 'Schedule not found' };
   }
 
+  const newPaidAmount = status === 'paid' ? Number(existing.expected_amount ?? 0) : 0;
+
   const {error} = await supabase
     .from('loan_schedules')
-    .update({status, paid_amount: paidAmount})
+    .update({status, paid_amount: newPaidAmount})
     .eq('id', scheduleId);
 
   if (error) {
@@ -40,7 +42,7 @@ export async function updateScheduleStatusAction(scheduleId: string, status: str
   }
 
   const oldPaid = Number(existing.paid_amount ?? 0);
-  const delta = Number(paidAmount ?? 0) - oldPaid;
+  const delta = newPaidAmount - oldPaid;
 
   if (delta !== 0) {
     const {data: loanRow, error: loanError} = await supabase
@@ -54,7 +56,7 @@ export async function updateScheduleStatusAction(scheduleId: string, status: str
     }
 
     const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
-    const newOutstanding = Math.max(currentOutstanding - delta, 0);
+    const newOutstanding = currentOutstanding - delta;
 
     const {error: updateLoanError} = await supabase
       .from('loans')
