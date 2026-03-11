@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   HandHeart,
   LayoutDashboard,
+  MessageSquare,
   ShieldCheck,
   Sprout,
   Tv,
@@ -28,7 +29,8 @@ const iconMap = {
   ShieldCheck,
   HandHeart,
   Bike,
-  FileSpreadsheet
+  FileSpreadsheet,
+  MessageSquare
 };
 
 type Props = {

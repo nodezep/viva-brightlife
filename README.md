@@ -21,12 +21,19 @@ Next.js 14 + Tailwind + Supabase admin management system for microfinance operat
 - Live groups and insurance lists from Supabase
 - Language toggle EN/SW with localStorage persistence
 - Theme toggle dark/light
+- SMS reminders module (queue + dispatch + logs + test SMS)
 
 ## Required SQL Files
 1. Schema + RLS:
 - `supabase/migrations/20260309_initial_microfinance_schema.sql`
 
-2. Optional sample data:
+2. SMS reminders schema:
+- `supabase/migrations/20260309_sms_reminders.sql`
+
+3. SMS delivery callback schema:
+- `supabase/migrations/20260309_sms_delivery_callbacks.sql`
+
+4. Optional sample data:
 - `supabase/seed.sql`
 
 ## Local Setup
@@ -42,9 +49,19 @@ cp .env.example .env.local
 Set in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SMS_PROVIDER` (`mock` or `twilio`)
+- `SMS_FROM`
+- `TWILIO_ACCOUNT_SID` (if using twilio)
+- `TWILIO_AUTH_TOKEN` (if using twilio)
+- `APP_BASE_URL` (public base URL used for Twilio callbacks)
+- `SMS_WEBHOOK_SECRET` (protects webhook route)
+- `JOB_SECRET`
 
 3. In Supabase SQL Editor:
 - Run `supabase/migrations/20260309_initial_microfinance_schema.sql`
+- Run `supabase/migrations/20260309_sms_reminders.sql`
+- Run `supabase/migrations/20260309_sms_delivery_callbacks.sql`
 - (Optional) Run `supabase/seed.sql`
 
 4. Create an auth user in Supabase (Email/Password).
@@ -57,6 +74,34 @@ npm run dev
 6. Open:
 - `http://localhost:3000/sw/login` (or `/en/login`)
 
+## SMS Reminders
+Admin UI page:
+- `/<locale>/sms-reminders`
+
+Available actions:
+- Queue overdue reminders now
+- Dispatch queued SMS now
+- Send test SMS
+- View reminder logs/status
+
+### Twilio Delivery Webhook
+When `SMS_PROVIDER=twilio`, outgoing messages include a Twilio `StatusCallback` URL automatically:
+- `${APP_BASE_URL}/api/sms/webhooks/twilio?secret=${SMS_WEBHOOK_SECRET}`
+
+Twilio delivery events update:
+- `delivery_status` (`sent`, `delivered`, `failed`)
+- `delivered_at`
+- `provider_payload`
+
+### Cron/Background Jobs
+You can schedule these secure endpoints (with header `x-job-token: <JOB_SECRET>`):
+- `POST /api/jobs/sms/queue`
+- `POST /api/jobs/sms/dispatch`
+
+Suggested schedule:
+- Queue: daily 07:30 (Africa/Dar_es_Salaam)
+- Dispatch: every 5-10 minutes
+
 ## Verification Status
 - `npm run typecheck` passes
 - `npm run build` passes
@@ -66,3 +111,10 @@ npm run dev
 - `POST /api/auth/logout`
 - `POST /api/loans`
 - `DELETE /api/loans?id=<loan_id>`
+- `POST /api/groups`
+- `POST/DELETE /api/groups/[groupId]/members`
+- `POST /api/sms/reminders/queue`
+- `POST /api/sms/reminders/dispatch`
+- `POST /api/sms/reminders/test`
+- `POST /api/jobs/sms/queue`
+- `POST /api/jobs/sms/dispatch`

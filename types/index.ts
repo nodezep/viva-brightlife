@@ -19,9 +19,7 @@ export type LoanRecord = {
   loanNumber: string;
   disbursementAmount: number;
   disbursementDate: string;
-  weeklyInstallment: number;
-  monthlyInstallment: number;
-  amountWithdrawn: number;
+  installmentSize: number;
   outstandingBalance: number;
   overdueAmount: number;
   status: LoanStatus;

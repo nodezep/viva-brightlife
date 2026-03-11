@@ -4,20 +4,23 @@ import {useMemo, useState} from 'react';
 import {Printer} from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import type {LoanRecord} from '@/types';
+import type {MarejeshoRow} from '@/lib/data';
 
 const reportTypes = [
   'monthly_collection',
   'disbursement',
   'overdue',
   'member_statement',
-  'group_performance'
+  'group_performance',
+  'marejesho_sheet'
 ] as const;
 
 type Props = {
   initialRows: LoanRecord[];
+  marejeshoRows: MarejeshoRow[];
 };
 
-export function ReportsModule({initialRows}: Props) {
+export function ReportsModule({initialRows, marejeshoRows}: Props) {
   const t = useTranslations();
   const [loanType, setLoanType] = useState('all');
   const [status, setStatus] = useState('all');
@@ -37,6 +40,31 @@ export function ReportsModule({initialRows}: Props) {
       }),
     [endDate, initialRows, loanType, startDate, status]
   );
+
+  const filteredMarejesho = useMemo(
+    () =>
+      marejeshoRows.filter((loan) => {
+        const typeOk = loanType === 'all' || loan.loanType === loanType;
+        const statusOk = status === 'all' || loan.status === status;
+        const dateOk =
+          (!startDate || loan.disbursementDate >= startDate) &&
+          (!endDate || loan.disbursementDate <= endDate);
+        return typeOk && statusOk && dateOk;
+      }),
+    [endDate, loanType, marejeshoRows, startDate, status]
+  );
+
+  const scheduleDates = useMemo(() => {
+    const dates = new Set<string>();
+    filteredMarejesho.forEach((loan) => {
+      loan.schedules.forEach((schedule) => {
+        if (startDate && schedule.expectedDate < startDate) return;
+        if (endDate && schedule.expectedDate > endDate) return;
+        dates.add(schedule.expectedDate);
+      });
+    });
+    return Array.from(dates).sort();
+  }, [filteredMarejesho, startDate, endDate]);
 
   return (
     <section className="space-y-4">
@@ -112,30 +140,81 @@ export function ReportsModule({initialRows}: Props) {
             {startDate || 'All'} to {endDate || 'All'}
           </p>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-muted/70 text-left">
-            <tr>
-              <th className="px-3 py-2">Member</th>
-              <th className="px-3 py-2">Loan Number</th>
-              <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2">Amount</th>
-              <th className="px-3 py-2">OS Balance</th>
-              <th className="px-3 py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-t">
-                <td className="px-3 py-2">{row.memberName}</td>
-                <td className="px-3 py-2">{row.loanNumber}</td>
-                <td className="px-3 py-2">{row.loanType}</td>
-                <td className="px-3 py-2">{row.disbursementAmount.toLocaleString()}</td>
-                <td className="px-3 py-2">{row.outstandingBalance.toLocaleString()}</td>
-                <td className="px-3 py-2 capitalize">{row.status}</td>
+        {reportType === 'marejesho_sheet' ? (
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/70 text-left">
+                <tr>
+                  <th className="px-3 py-2">Member</th>
+                  <th className="px-3 py-2">Loan Number</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Disbursement Date</th>
+                  <th className="px-3 py-2">Installment</th>
+                  <th className="px-3 py-2">OS Balance</th>
+                  {scheduleDates.map((date) => (
+                    <th key={date} className="px-3 py-2 whitespace-nowrap">
+                      {date}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMarejesho.map((row) => {
+                  const scheduleMap = new Map(
+                    row.schedules.map((s) => [s.expectedDate, s])
+                  );
+                  return (
+                    <tr key={row.id} className="border-t">
+                      <td className="px-3 py-2">{row.memberName}</td>
+                      <td className="px-3 py-2">{row.loanNumber}</td>
+                      <td className="px-3 py-2">{row.loanType}</td>
+                      <td className="px-3 py-2">{row.disbursementDate}</td>
+                      <td className="px-3 py-2">{row.installmentAmount.toLocaleString()}</td>
+                      <td className="px-3 py-2">{row.outstandingBalance.toLocaleString()}</td>
+                      {scheduleDates.map((date) => {
+                        const sched = scheduleMap.get(date);
+                        const value =
+                          sched && sched.paidAmount > 0
+                            ? sched.paidAmount
+                            : sched?.expectedAmount ?? null;
+                        return (
+                          <td key={date} className="px-3 py-2">
+                            {value ? value.toLocaleString() : ''}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-muted/70 text-left">
+              <tr>
+                <th className="px-3 py-2">Member</th>
+                <th className="px-3 py-2">Loan Number</th>
+                <th className="px-3 py-2">Type</th>
+                <th className="px-3 py-2">Amount</th>
+                <th className="px-3 py-2">OS Balance</th>
+                <th className="px-3 py-2">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t">
+                  <td className="px-3 py-2">{row.memberName}</td>
+                  <td className="px-3 py-2">{row.loanNumber}</td>
+                  <td className="px-3 py-2">{row.loanType}</td>
+                  <td className="px-3 py-2">{row.disbursementAmount.toLocaleString()}</td>
+                  <td className="px-3 py-2">{row.outstandingBalance.toLocaleString()}</td>
+                  <td className="px-3 py-2 capitalize">{row.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </section>
   );

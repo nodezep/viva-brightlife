@@ -5,14 +5,12 @@ import {Plus} from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import {LoanForm} from './loan-form';
 import type {LoanType} from '@/types';
-import type {MemberOption} from '@/lib/data';
 
 type Props = {
   loanType: LoanType;
-  members: MemberOption[];
 };
 
-export function LoanFormDialog({loanType, members}: Props) {
+export function LoanFormDialog({loanType}: Props) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
 
@@ -29,7 +27,7 @@ export function LoanFormDialog({loanType, members}: Props) {
       
       {open ? (
         <div className="mb-4">
-           <LoanForm loanType={loanType} members={members} onClose={() => setOpen(false)} />
+           <LoanForm loanType={loanType} onClose={() => setOpen(false)} />
         </div>
       ) : null}
     </div>

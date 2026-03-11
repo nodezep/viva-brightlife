@@ -10,8 +10,6 @@ type LoanRow = {
   principal_amount: number;
   disbursement_date: string;
   weekly_installment: number;
-  monthly_installment: number;
-  amount_withdrawn: number;
   outstanding_balance: number;
   overdue_amount: number;
   status: 'active' | 'closed' | 'defaulted' | 'pending';
@@ -40,9 +38,7 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     loanNumber: row.loan_number,
     disbursementAmount: Number(row.principal_amount ?? 0),
     disbursementDate: row.disbursement_date,
-    weeklyInstallment: Number(row.weekly_installment ?? 0),
-    monthlyInstallment: Number(row.monthly_installment ?? 0),
-    amountWithdrawn: Number(row.amount_withdrawn ?? 0),
+    installmentSize: Number(row.weekly_installment ?? 0),
     outstandingBalance: Number(row.outstanding_balance ?? 0),
     overdueAmount: Number(row.overdue_amount ?? 0),
     status: row.status,
@@ -63,7 +59,7 @@ export async function getLoansByType(
   let dbQuery = supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,monthly_installment,amount_withdrawn,outstanding_balance,overdue_amount,status,members!inner(member_number,full_name)',
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,status,members!inner(member_number,full_name)',
       { count: 'exact' }
     )
     .eq('loan_type', loanType);
@@ -107,7 +103,7 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   const {data, error} = await supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,monthly_installment,amount_withdrawn,outstanding_balance,overdue_amount,status,members(member_number,full_name)'
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,status,members(member_number,full_name)'
     )
     .order('created_at', {ascending: false});
 
@@ -116,6 +112,82 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   }
 
   return (data as unknown as LoanRow[]).map(toLoanRecord);
+}
+
+export type MarejeshoSchedule = {
+  expectedDate: string;
+  expectedAmount: number;
+  paidAmount: number;
+};
+
+export type MarejeshoRow = {
+  id: string;
+  memberNumber: string;
+  memberName: string;
+  loanNumber: string;
+  loanType: LoanType;
+  cycle: number;
+  securityAmount: number;
+  disbursementDate: string;
+  installmentAmount: number;
+  outstandingBalance: number;
+  status: 'active' | 'closed' | 'defaulted' | 'pending';
+  schedules: MarejeshoSchedule[];
+};
+
+type MarejeshoRowRaw = {
+  id: string;
+  loan_number: string;
+  loan_type: LoanType;
+  cycle_count: number;
+  security_amount: number;
+  disbursement_date: string;
+  weekly_installment: number;
+  outstanding_balance: number;
+  status: 'active' | 'closed' | 'defaulted' | 'pending';
+  members:
+    | {member_number: string; full_name: string}
+    | {member_number: string; full_name: string}[]
+    | null;
+  loan_schedules:
+    | {expected_date: string; expected_amount: number; paid_amount: number}[]
+    | null;
+};
+
+export async function getMarejeshoReportRows(): Promise<MarejeshoRow[]> {
+  const supabase = createClient();
+  const {data, error} = await supabase
+    .from('loans')
+    .select(
+      'id,loan_number,loan_type,cycle_count,security_amount,disbursement_date,weekly_installment,outstanding_balance,status,members(member_number,full_name),loan_schedules(expected_date,expected_amount,paid_amount)'
+    )
+    .order('created_at', {ascending: false});
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as unknown as MarejeshoRowRaw[]).map((row) => {
+    const member = pickSingleRelation(row.members);
+    return {
+      id: row.id,
+      memberNumber: member?.member_number ?? '-',
+      memberName: member?.full_name ?? '-',
+      loanNumber: row.loan_number,
+      loanType: row.loan_type,
+      cycle: row.cycle_count,
+      securityAmount: Number(row.security_amount ?? 0),
+      disbursementDate: row.disbursement_date,
+      installmentAmount: Number(row.weekly_installment ?? 0),
+      outstandingBalance: Number(row.outstanding_balance ?? 0),
+      status: row.status,
+      schedules: (row.loan_schedules ?? []).map((s) => ({
+        expectedDate: s.expected_date,
+        expectedAmount: Number(s.expected_amount ?? 0),
+        paidAmount: Number(s.paid_amount ?? 0)
+      }))
+    };
+  });
 }
 
 export async function getDashboardMetrics() {
@@ -324,6 +396,23 @@ export async function getMembersForGroupSelection(): Promise<MemberOption[]> {
     fullName: member.full_name,
     phone: member.phone ?? null
   }));
+}
+
+export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
+  const supabase = createClient();
+  const {data, error} = await supabase
+    .from('loans')
+    .select(
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,status,members(member_number,full_name)'
+    )
+    .eq('group_id', groupId)
+    .order('created_at', {ascending: false});
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as unknown as LoanRow[]).map(toLoanRecord);
 }
 
 export type InsuranceView = {

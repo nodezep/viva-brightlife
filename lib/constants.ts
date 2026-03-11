@@ -14,7 +14,8 @@ export const navItems: NavItem[] = [
     icon: 'HandHeart'
   },
   {key: 'mikopo_vyombo_moto', href: '/mikopo-vyombo-moto', icon: 'Bike'},
-  {key: 'ripoti', href: '/ripoti', icon: 'FileSpreadsheet'}
+  {key: 'ripoti', href: '/ripoti', icon: 'FileSpreadsheet'},
+  {key: 'sms_reminders', href: '/sms-reminders', icon: 'MessageSquare'}
 ];
 
 export const loanPageMap: Record<string, LoanType> = {

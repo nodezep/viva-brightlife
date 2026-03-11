@@ -1,6 +1,6 @@
 import {getTranslations} from 'next-intl/server';
 import type {LoanType} from '@/types';
-import {getLoansByType, getMembersForGroupSelection} from '@/lib/data';
+import {getLoansByType} from '@/lib/data';
 import {LoanFilters} from './loan-filters';
 import {LoanTable} from './loan-table';
 import {LoanFormDialog} from './loan-form-dialog';
@@ -18,10 +18,7 @@ type Props = {
 
 export async function LoanModule({loanType, title, query, startDate, endDate, page}: Props) {
   const t = await getTranslations();
-  const [members, {data: rows, count}] = await Promise.all([
-    getMembersForGroupSelection(),
-    getLoansByType(loanType, query, startDate, endDate, page)
-  ]);
+  const {data: rows, count} = await getLoansByType(loanType, query, startDate, endDate, page);
 
   return (
     <section className="space-y-4 relative w-full">
@@ -33,7 +30,7 @@ export async function LoanModule({loanType, title, query, startDate, endDate, pa
         
         <div className="no-print flex gap-2">
           <PrintButton />
-          <LoanFormDialog loanType={loanType} members={members} />
+          <LoanFormDialog loanType={loanType} />
         </div>
       </div>
       

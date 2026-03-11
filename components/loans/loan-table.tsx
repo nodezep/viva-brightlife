@@ -1,11 +1,12 @@
 'use client';
 
-import {useTransition} from 'react';
-import {Trash2, Download} from 'lucide-react';
+import {useTransition, useState} from 'react';
+import {Trash2, Download, CalendarDays} from 'lucide-react';
 import {useTranslations} from 'next-intl';
-import type {LoanRecord} from '@/types';
+import type {LoanRecord, LoanType} from '@/types';
 import {deleteLoanAction} from '@/lib/actions/loan';
-import type {LoanType} from '@/types';
+import {LoanSchedulesDialog} from './loan-schedules-dialog';
+import {LoanEditForm} from './loan-edit-form';
 
 type Props = {
   loanType: LoanType;
@@ -22,6 +23,8 @@ const currency = new Intl.NumberFormat('en-US', {
 export function LoanTable({loanType, rows, count}: Props) {
   const t = useTranslations();
   const [isPending, startTransition] = useTransition();
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+  const [editingLoan, setEditingLoan] = useState<LoanRecord | null>(null);
 
   const exportCsv = () => {
     const headers = [
@@ -33,9 +36,7 @@ export function LoanTable({loanType, rows, count}: Props) {
       'loan_number',
       'disbursement_amount',
       'disbursement_date',
-      'weekly_installment',
-      'monthly_installment',
-      'amount_withdrawn',
+      'installment_size',
       'os_balance',
       'overdue_od',
       'status'
@@ -59,9 +60,7 @@ export function LoanTable({loanType, rows, count}: Props) {
         r.loanNumber,
         r.disbursementAmount,
         excelSafeDate(r.disbursementDate),
-        r.weeklyInstallment,
-        r.monthlyInstallment,
-        r.amountWithdrawn,
+        r.installmentSize,
         r.outstandingBalance,
         r.overdueAmount,
         r.status
@@ -115,11 +114,10 @@ export function LoanTable({loanType, rows, count}: Props) {
               <th className="px-3 py-2">{t('table.loan_number')}</th>
               <th className="px-3 py-2">{t('table.disbursement_amount')}</th>
               <th className="px-3 py-2">{t('table.disbursement_date')}</th>
-              <th className="px-3 py-2">{t('table.weekly_installment')}</th>
-              <th className="px-3 py-2">{t('table.monthly_installment')}</th>
-              <th className="px-3 py-2">{t('table.amount_withdrawn')}</th>
+              <th className="px-3 py-2">{t('table.installment_size')}</th>
               <th className="px-3 py-2">{t('table.os_balance')}</th>
               <th className="px-3 py-2">{t('table.overdue_od')}</th>
+              <th className="px-3 py-2">MAREJESHO</th>
               <th className="px-3 py-2">{t('table.status')}</th>
               <th className="px-3 py-2 no-print">{t('table.actions')}</th>
             </tr>
@@ -135,18 +133,24 @@ export function LoanTable({loanType, rows, count}: Props) {
                 <td className="px-3 py-2">{row.loanNumber}</td>
                 <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
                 <td className="px-3 py-2">{row.disbursementDate}</td>
-                <td className="px-3 py-2">{currency.format(row.weeklyInstallment)}</td>
-                <td className="px-3 py-2">{currency.format(row.monthlyInstallment)}</td>
-                <td className="px-3 py-2">{currency.format(row.amountWithdrawn)}</td>
+                <td className="px-3 py-2">{currency.format(row.installmentSize)}</td>
                 <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
                 <td className="px-3 py-2">{currency.format(row.overdueAmount)}</td>
+                <td className="px-3 py-2">
+                  <button 
+                    className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                    onClick={() => setSelectedLoanId(row.id)}
+                  >
+                    <CalendarDays size={12} /> Marejesho
+                  </button>
+                </td>
                 <td className="px-3 py-2 capitalize">{row.status}</td>
                 <td className="px-3 py-2 no-print">
                   <div className="flex gap-1">
-                    <button className="rounded-md border px-2 py-1 text-xs hover:bg-muted">
-                      {t('buttons.view')}
-                    </button>
-                    <button className="rounded-md border px-2 py-1 text-xs hover:bg-muted">
+                    <button
+                      className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                      onClick={() => setEditingLoan(row)}
+                    >
                       {t('buttons.edit')}
                     </button>
                     <button
@@ -161,7 +165,7 @@ export function LoanTable({loanType, rows, count}: Props) {
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-3 py-6 text-center text-muted-foreground" colSpan={15}>
+                <td className="px-3 py-6 text-center text-muted-foreground" colSpan={13}>
                   No records found.
                 </td>
               </tr>
@@ -169,6 +173,19 @@ export function LoanTable({loanType, rows, count}: Props) {
           </tbody>
         </table>
       </div>
+
+      {selectedLoanId && (
+        <LoanSchedulesDialog
+          loanId={selectedLoanId}
+          onClose={() => setSelectedLoanId(null)}
+        />
+      )}
+
+      {editingLoan ? (
+        <div className="mt-4">
+          <LoanEditForm loan={editingLoan} onClose={() => setEditingLoan(null)} />
+        </div>
+      ) : null}
     </>
   );
 }

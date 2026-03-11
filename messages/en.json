@@ -13,7 +13,8 @@
     "huduma_bima": "Insurance Services",
     "mikopo_vikundi_wakinamama": "Women's Group Loans",
     "mikopo_vyombo_moto": "Vehicle Loans",
-    "ripoti": "Reports"
+    "ripoti": "Reports",
+    "sms_reminders": "SMS Reminders"
   },
   "table": {
     "number": "Number",
@@ -24,9 +25,7 @@
     "loan_number": "Loan Number",
     "disbursement_amount": "Disbursement Amount",
     "disbursement_date": "Disbursement Date",
-    "weekly_installment": "Weekly Installment",
-    "monthly_installment": "Monthly Installment",
-    "amount_withdrawn": "Amount Withdrawn",
+    "installment_size": "Installment Size",
     "os_balance": "OS Balance",
     "overdue_od": "Overdue OD",
     "status": "Status",
@@ -43,7 +42,9 @@
     "search": "Search",
     "logout": "Logout",
     "view": "View",
-    "apply_filters": "Apply Filters"
+    "apply_filters": "Apply Filters",
+    "previous": "Previous",
+    "next": "Next"
   },
   "dashboard": {
     "total_active_loans": "Total Active Loans",
@@ -67,6 +68,7 @@
     "overdue": "Overdue Report",
     "member_statement": "Member Statement",
     "group_performance": "Group Performance Report",
+    "marejesho_sheet": "Marejesho Sheet",
     "loan_type": "Loan Type",
     "date_start": "Start Date",
     "date_end": "End Date"

@@ -13,7 +13,8 @@
     "huduma_bima": "Huduma za Bima",
     "mikopo_vikundi_wakinamama": "Mikopo ya Vikundi vya Wakina Mama",
     "mikopo_vyombo_moto": "Mikopo ya Vyombo vya Moto",
-    "ripoti": "Ripoti"
+    "ripoti": "Ripoti",
+    "sms_reminders": "Vikumbusho vya SMS"
   },
   "table": {
     "number": "Namba",
@@ -24,9 +25,7 @@
     "loan_number": "Namba ya Mkopo",
     "disbursement_amount": "Kiasi Kilichotolewa",
     "disbursement_date": "Tarehe ya Kutolewa",
-    "weekly_installment": "Lejesho la Wikiwiki",
-    "monthly_installment": "Marejesho ya Mwezi",
-    "amount_withdrawn": "Kiasi Alichoondoka Nacho",
+    "installment_size": "Kiasi cha Marejesho",
     "os_balance": "OS Balance",
     "overdue_od": "Overdue OD",
     "status": "Hali",
@@ -43,7 +42,9 @@
     "search": "Tafuta",
     "logout": "Toka",
     "view": "Angalia",
-    "apply_filters": "Weka Filters"
+    "apply_filters": "Weka Filters",
+    "previous": "Nyuma",
+    "next": "Inayofuata"
   },
   "dashboard": {
     "total_active_loans": "Jumla ya Mikopo Hai",
@@ -67,6 +68,7 @@
     "overdue": "Ripoti ya Overdue",
     "member_statement": "Taarifa ya Mwanachama",
     "group_performance": "Ripoti ya Utendaji wa Kikundi",
+    "marejesho_sheet": "Jedwali la Marejesho",
     "loan_type": "Aina ya Mkopo",
     "date_start": "Tarehe ya Kuanza",
     "date_end": "Tarehe ya Mwisho"

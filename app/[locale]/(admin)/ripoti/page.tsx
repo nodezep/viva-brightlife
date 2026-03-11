@@ -1,7 +1,10 @@
 import {ReportsModule} from '@/components/reports/reports-module';
-import {getAllLoans} from '@/lib/data';
+import {getAllLoans, getMarejeshoReportRows} from '@/lib/data';
 
 export default async function RipotiPage() {
-  const rows = await getAllLoans();
-  return <ReportsModule initialRows={rows} />;
+  const [rows, marejeshoRows] = await Promise.all([
+    getAllLoans(),
+    getMarejeshoReportRows()
+  ]);
+  return <ReportsModule initialRows={rows} marejeshoRows={marejeshoRows} />;
 }
