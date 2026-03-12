@@ -29,7 +29,19 @@
     "os_balance": "OS Balance",
     "overdue_od": "Overdue OD",
     "status": "Hali",
-    "actions": "Vitendo"
+    "actions": "Vitendo",
+    "sno": "S/No",
+    "name": "Jina",
+    "loan_amount": "Kiasi cha Mkopo",
+    "return_date": "Tarehe ya Rejesho",
+    "days_overdue": "Idadi ya Siku za Malimbikizo",
+    "interest_rate": "Asilimia ya Riba",
+    "interest_amount": "Riba",
+    "loan_duration_months": "Muda wa Mkopo (Mwezi)",
+    "amount_paid": "Malipo ya Mkopo",
+    "total_repay": "Mkopo + Rejesho",
+    "balance": "Deni",
+    "phone_number": "Namba ya Simu"
   },
   "buttons": {
     "add_new": "Ongeza Mpya",

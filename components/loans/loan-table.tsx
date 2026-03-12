@@ -172,19 +172,19 @@ export function LoanTable({loanType, rows, count}: Props) {
           <table className="min-w-[1600px] w-full text-sm">
             <thead className="bg-muted/70 text-left">
               <tr>
-                <th className="px-3 py-2">S/NO</th>
-                <th className="px-3 py-2">JINA</th>
-                <th className="px-3 py-2">KIASI CHA MKOPO</th>
-                <th className="px-3 py-2">TAREHE YA MKOPAJI</th>
-                <th className="px-3 py-2">TAREHE YA REJESHO</th>
-                <th className="px-3 py-2">IDADI YA SIKU ZA MALIMBIKIZO</th>
-                <th className="px-3 py-2">ASILIMIA YA RIBA</th>
-                <th className="px-3 py-2">RIBA</th>
-                <th className="px-3 py-2">MUDA WA MKOPO (MWEZI)</th>
-                <th className="px-3 py-2">MALIPO YA MKOPO</th>
-                <th className="px-3 py-2">MKOPO + REJESHO</th>
-                <th className="px-3 py-2">DENI</th>
-                <th className="px-3 py-2">NAMBA YA SIMU</th>
+                <th className="px-3 py-2">{t('table.sno')}</th>
+                <th className="px-3 py-2">{t('table.name')}</th>
+                <th className="px-3 py-2">{t('table.loan_amount')}</th>
+                <th className="px-3 py-2">{t('table.disbursement_date')}</th>
+                <th className="px-3 py-2">{t('table.return_date')}</th>
+                <th className="px-3 py-2">{t('table.days_overdue')}</th>
+                <th className="px-3 py-2">{t('table.interest_rate')}</th>
+                <th className="px-3 py-2">{t('table.interest_amount')}</th>
+                <th className="px-3 py-2">{t('table.loan_duration_months')}</th>
+                <th className="px-3 py-2">{t('table.amount_paid')}</th>
+                <th className="px-3 py-2">{t('table.total_repay')}</th>
+                <th className="px-3 py-2">{t('table.balance')}</th>
+                <th className="px-3 py-2">{t('table.phone_number')}</th>
                 <th className="px-3 py-2 no-print">{t('table.actions')}</th>
               </tr>
             </thead>

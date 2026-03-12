@@ -29,7 +29,19 @@
     "os_balance": "OS Balance",
     "overdue_od": "Overdue OD",
     "status": "Status",
-    "actions": "Actions"
+    "actions": "Actions",
+    "sno": "S/No",
+    "name": "Name",
+    "loan_amount": "Loan Amount",
+    "return_date": "Return Date",
+    "days_overdue": "Days Overdue",
+    "interest_rate": "Interest Rate",
+    "interest_amount": "Interest",
+    "loan_duration_months": "Loan Duration (Months)",
+    "amount_paid": "Amount Paid",
+    "total_repay": "Loan + Repayment",
+    "balance": "Balance",
+    "phone_number": "Phone Number"
   },
   "buttons": {
     "add_new": "Add New",
