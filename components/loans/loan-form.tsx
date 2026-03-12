@@ -4,6 +4,7 @@ import {useTransition, useState, useEffect} from 'react';
 import {useTranslations} from 'next-intl';
 import {createLoanAction} from '@/lib/actions/loan';
 import type {LoanType} from '@/types';
+import {useRouter} from '@/lib/navigation';
 
 type Props = {
   loanType: LoanType;
@@ -12,6 +13,7 @@ type Props = {
 
 export function LoanForm({loanType, onClose}: Props) {
   const t = useTranslations();
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isIndividual = loanType === 'binafsi';
@@ -55,6 +57,7 @@ export function LoanForm({loanType, onClose}: Props) {
         setError(result.error);
       } else {
         onClose();
+        router.refresh();
       }
     });
   };

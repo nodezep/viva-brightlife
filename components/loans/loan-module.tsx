@@ -15,11 +15,12 @@ type Props = {
   startDate: string;
   endDate: string;
   page: number;
+  sort: string;
 };
 
-export async function LoanModule({loanType, title, query, startDate, endDate, page}: Props) {
+export async function LoanModule({loanType, title, query, startDate, endDate, page, sort}: Props) {
   const t = await getTranslations();
-  const {data: rows, count} = await getLoansByType(loanType, query, startDate, endDate, page);
+  const {data: rows, count} = await getLoansByType(loanType, query, startDate, endDate, page, sort as any);
 
   return (
     <section className="space-y-4 relative w-full">

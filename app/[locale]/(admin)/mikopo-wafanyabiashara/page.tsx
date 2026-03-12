@@ -9,6 +9,7 @@ export default async function Page({
   const startDate = typeof searchParams?.startDate === 'string' ? searchParams.startDate : '';
   const endDate = typeof searchParams?.endDate === 'string' ? searchParams.endDate : '';
   const page = typeof searchParams?.page === 'string' ? parseInt(searchParams.page) : 1;
+  const sort = typeof searchParams?.sort === 'string' ? searchParams.sort : 'newest';
 
   return (
     <LoanModule 
@@ -18,6 +19,7 @@ export default async function Page({
       startDate={startDate} 
       endDate={endDate} 
       page={page || 1} 
+      sort={sort}
     />
   );
 }

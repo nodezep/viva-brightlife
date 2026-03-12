@@ -55,12 +55,21 @@ function toLoanRecord(row: LoanRow): LoanRecord {
   };
 }
 
+export type LoanSort =
+  | 'newest'
+  | 'oldest'
+  | 'sno_asc'
+  | 'sno_desc'
+  | 'name_asc'
+  | 'name_desc';
+
 export async function getLoansByType(
   loanType: LoanType,
   query?: string,
   startDate?: string,
   endDate?: string,
-  page: number = 1
+  page: number = 1,
+  sort: LoanSort = 'newest'
 ): Promise<{ data: LoanRecord[]; count: number }> {
   const supabase = createClient();
   const PAGE_SIZE = 50;
@@ -93,9 +102,41 @@ export async function getLoansByType(
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data, count, error } = await dbQuery
-    .order('created_at', { ascending: false })
-    .range(from, to);
+  switch (sort) {
+    case 'oldest':
+      dbQuery = dbQuery.order('created_at', {ascending: true});
+      break;
+    case 'sno_asc':
+      dbQuery = dbQuery.order('member_number', {
+        ascending: true,
+        foreignTable: 'members'
+      });
+      break;
+    case 'sno_desc':
+      dbQuery = dbQuery.order('member_number', {
+        ascending: false,
+        foreignTable: 'members'
+      });
+      break;
+    case 'name_asc':
+      dbQuery = dbQuery.order('full_name', {
+        ascending: true,
+        foreignTable: 'members'
+      });
+      break;
+    case 'name_desc':
+      dbQuery = dbQuery.order('full_name', {
+        ascending: false,
+        foreignTable: 'members'
+      });
+      break;
+    case 'newest':
+    default:
+      dbQuery = dbQuery.order('created_at', {ascending: false});
+      break;
+  }
+
+  const { data, count, error } = await dbQuery.range(from, to);
 
   if (error || !data) {
     return { data: [], count: 0 };

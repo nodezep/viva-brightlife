@@ -191,7 +191,7 @@ export function GroupMembersModule({group, loans}: Props) {
           <button
             type="button"
             onClick={() => router.push('/mikopo-vikundi-wakinamama')}
-            className="mb-2 inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+            className="mb-2 inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
           >
             <ArrowLeft size={14} /> Back to Groups
           </button>
@@ -203,7 +203,9 @@ export function GroupMembersModule({group, loans}: Props) {
             type="button"
             onClick={() => setView('members')}
             className={`rounded-lg border px-3 py-2 text-sm ${
-              view === 'members' ? 'bg-primary text-primary-foreground' : 'bg-card'
+              view === 'members'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-primary/10 text-primary hover:opacity-80'
             }`}
           >
             Members
@@ -212,7 +214,9 @@ export function GroupMembersModule({group, loans}: Props) {
             type="button"
             onClick={() => setView('loans')}
             className={`rounded-lg border px-3 py-2 text-sm ${
-              view === 'loans' ? 'bg-primary text-primary-foreground' : 'bg-card'
+              view === 'loans'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-primary/10 text-primary hover:opacity-80'
             }`}
           >
             Loans
@@ -226,7 +230,7 @@ export function GroupMembersModule({group, loans}: Props) {
             <button
               type="button"
               onClick={() => setShowNewRow((value) => !value)}
-              className="inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
             >
               <Plus size={16} /> {showNewRow ? 'Close Form' : 'Add New Member'}
             </button>

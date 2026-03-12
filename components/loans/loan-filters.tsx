@@ -15,9 +15,10 @@ export function LoanFilters() {
   const [query, setQuery] = useState(searchParams.get('query') || '');
   const [startDate, setStartDate] = useState(searchParams.get('startDate') || '');
   const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
+  const [sort, setSort] = useState(searchParams.get('sort') || 'newest');
 
   const applyFilters = useCallback(
-    (newQuery: string, newStart: string, newEnd: string) => {
+    (newQuery: string, newStart: string, newEnd: string, newSort: string) => {
       const params = new URLSearchParams(searchParams.toString());
       if (newQuery) params.set('query', newQuery);
       else params.delete('query');
@@ -27,6 +28,9 @@ export function LoanFilters() {
       
       if (newEnd) params.set('endDate', newEnd);
       else params.delete('endDate');
+
+      if (newSort && newSort !== 'newest') params.set('sort', newSort);
+      else params.delete('sort');
       
       params.set('page', '1');
 
@@ -38,7 +42,7 @@ export function LoanFilters() {
   );
 
   return (
-    <div className={`no-print grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-4 ${isPending ? 'opacity-50' : ''}`}>
+    <div className={`no-print grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-5 ${isPending ? 'opacity-50' : ''}`}>
       <label className="relative md:col-span-2">
         <Search className="pointer-events-none absolute left-3 top-2.5" size={16} />
         <input
@@ -47,7 +51,7 @@ export function LoanFilters() {
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            applyFilters(e.target.value, startDate, endDate);
+            applyFilters(e.target.value, startDate, endDate, sort);
           }}
         />
       </label>
@@ -57,7 +61,7 @@ export function LoanFilters() {
         value={startDate}
         onChange={(e) => {
           setStartDate(e.target.value);
-          applyFilters(query, e.target.value, endDate);
+          applyFilters(query, e.target.value, endDate, sort);
         }}
       />
       <input
@@ -66,9 +70,24 @@ export function LoanFilters() {
         value={endDate}
         onChange={(e) => {
           setEndDate(e.target.value);
-          applyFilters(query, startDate, e.target.value);
+          applyFilters(query, startDate, e.target.value, sort);
         }}
       />
+      <select
+        className="rounded-lg border bg-background px-3 py-2 text-sm"
+        value={sort}
+        onChange={(e) => {
+          setSort(e.target.value);
+          applyFilters(query, startDate, endDate, e.target.value);
+        }}
+      >
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="sno_asc">S/NO (Asc)</option>
+        <option value="sno_desc">S/NO (Desc)</option>
+        <option value="name_asc">Name (A-Z)</option>
+        <option value="name_desc">Name (Z-A)</option>
+      </select>
     </div>
   );
 }

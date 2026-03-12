@@ -1,6 +1,6 @@
 'use client';
 
-import {useTransition, useState, useEffect, useCallback} from 'react';
+import {Fragment, useTransition, useState, useEffect, useCallback} from 'react';
 import {Trash2, CalendarDays} from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import type {LoanRecord, LoanType} from '@/types';
@@ -25,7 +25,7 @@ export function LoanTable({loanType, rows, count}: Props) {
   const t = useTranslations();
   const [isPending, startTransition] = useTransition();
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
-  const [editingLoan, setEditingLoan] = useState<LoanRecord | null>(null);
+  const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
   const isIndividual = loanType === 'binafsi';
   const [deleteTarget, setDeleteTarget] = useState<LoanRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -96,7 +96,7 @@ export function LoanTable({loanType, rows, count}: Props) {
               : 0;
         const rateDecimal = ratePercent <= 1 ? ratePercent : ratePercent / 100;
         return [
-          index + 1,
+          r.memberNumber,
           r.memberName,
           r.disbursementAmount,
           excelSafeDate(r.disbursementDate),
@@ -200,37 +200,51 @@ export function LoanTable({loanType, rows, count}: Props) {
                 const rateDecimal =
                   ratePercent <= 1 ? ratePercent : ratePercent / 100;
                 return (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2">{index + 1}</td>
-                    <td className="px-3 py-2">{row.memberName}</td>
-                    <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
-                    <td className="px-3 py-2">{row.disbursementDate}</td>
-                    <td className="px-3 py-2">{returnDate}</td>
-                    <td className="px-3 py-2">{row.daysOverdue ?? 0}</td>
-                    <td className="px-3 py-2">{rateDecimal}</td>
-                    <td className="px-3 py-2">{currency.format(row.securityAmount)}</td>
-                    <td className="px-3 py-2">{row.cycle}</td>
-                    <td className="px-3 py-2">{currency.format(row.amountPaid ?? 0)}</td>
-                    <td className="px-3 py-2">{currency.format(row.installmentSize)}</td>
-                    <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
-                    <td className="px-3 py-2">{row.memberPhone ?? '-'}</td>
-                    <td className="px-3 py-2 no-print">
-                      <div className="flex gap-1">
-                        <button
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                          onClick={() => setEditingLoan(row)}
-                        >
-                          {t('buttons.edit')}
-                        </button>
-                        <button
-                          className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50"
-                          onClick={() => handleDelete(row)}
-                        >
-                          <Trash2 size={12} /> {t('buttons.delete')}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={row.id}>
+                    <tr className="border-t">
+                      <td className="px-3 py-2">{index + 1}</td>
+                      <td className="px-3 py-2">{row.memberName}</td>
+                      <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
+                      <td className="px-3 py-2">{row.disbursementDate}</td>
+                      <td className="px-3 py-2">{returnDate}</td>
+                      <td className="px-3 py-2">{row.daysOverdue ?? 0}</td>
+                      <td className="px-3 py-2">{rateDecimal}</td>
+                      <td className="px-3 py-2">{currency.format(row.securityAmount)}</td>
+                      <td className="px-3 py-2">{row.cycle}</td>
+                      <td className="px-3 py-2">{currency.format(row.amountPaid ?? 0)}</td>
+                      <td className="px-3 py-2">{currency.format(row.installmentSize)}</td>
+                      <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
+                      <td className="px-3 py-2">{row.memberPhone ?? '-'}</td>
+                      <td className="px-3 py-2 no-print">
+                        <div className="flex gap-1">
+                          <button
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                            onClick={() =>
+                              setEditingLoanId(editingLoanId === row.id ? null : row.id)
+                            }
+                          >
+                            {t('buttons.edit')}
+                          </button>
+                          <button
+                            className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50"
+                            onClick={() => handleDelete(row)}
+                          >
+                            <Trash2 size={12} /> {t('buttons.delete')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {editingLoanId === row.id ? (
+                      <tr className="border-t bg-muted/20">
+                        <td colSpan={14} className="px-3 py-3">
+                          <LoanEditForm
+                            loan={row}
+                            onClose={() => setEditingLoanId(null)}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
               {rows.length === 0 ? (
@@ -264,46 +278,60 @@ export function LoanTable({loanType, rows, count}: Props) {
             </thead>
             <tbody className={isPending ? 'opacity-50' : ''}>
               {rows.map((row, index) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">{index + 1}</td>
-                  <td className="px-3 py-2">{row.memberNumber}</td>
-                  <td className="px-3 py-2">{row.memberName}</td>
-                  <td className="px-3 py-2 hidden lg:table-cell">{row.cycle}</td>
-                  <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.securityAmount)}</td>
-                  <td className="px-3 py-2">{row.loanNumber}</td>
-                  <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
-                  <td className="px-3 py-2 hidden md:table-cell">{row.disbursementDate}</td>
-                  <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.installmentSize)}</td>
-                  <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
-                  <td className="px-3 py-2 hidden md:table-cell">
-                    {currency.format(row.overdueAmount)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button 
-                      className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                      onClick={() => setSelectedLoanId(row.id)}
-                    >
-                      <CalendarDays size={12} /> Marejesho
-                    </button>
-                  </td>
-                  <td className="px-3 py-2 hidden md:table-cell capitalize">{row.status}</td>
-                  <td className="px-3 py-2 no-print">
-                    <div className="flex gap-1">
-                      <button
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                        onClick={() => setEditingLoan(row)}
+                <Fragment key={row.id}>
+                  <tr className="border-t">
+                    <td className="px-3 py-2">{row.memberNumber}</td>
+                    <td className="px-3 py-2">{row.memberNumber}</td>
+                    <td className="px-3 py-2">{row.memberName}</td>
+                    <td className="px-3 py-2 hidden lg:table-cell">{row.cycle}</td>
+                    <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.securityAmount)}</td>
+                    <td className="px-3 py-2">{row.loanNumber}</td>
+                    <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
+                    <td className="px-3 py-2 hidden md:table-cell">{row.disbursementDate}</td>
+                    <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.installmentSize)}</td>
+                    <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
+                    <td className="px-3 py-2 hidden md:table-cell">
+                      {currency.format(row.overdueAmount)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <button 
+                        className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                        onClick={() => setSelectedLoanId(row.id)}
                       >
-                        {t('buttons.edit')}
+                        <CalendarDays size={12} /> Marejesho
                       </button>
-                      <button
-                        className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50"
-                        onClick={() => handleDelete(row)}
-                      >
-                        <Trash2 size={12} /> {t('buttons.delete')}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-3 py-2 hidden md:table-cell capitalize">{row.status}</td>
+                    <td className="px-3 py-2 no-print">
+                      <div className="flex gap-1">
+                        <button
+                          className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                          onClick={() =>
+                            setEditingLoanId(editingLoanId === row.id ? null : row.id)
+                          }
+                        >
+                          {t('buttons.edit')}
+                        </button>
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50"
+                          onClick={() => handleDelete(row)}
+                        >
+                          <Trash2 size={12} /> {t('buttons.delete')}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {editingLoanId === row.id ? (
+                    <tr className="border-t bg-muted/20">
+                      <td colSpan={14} className="px-3 py-3">
+                        <LoanEditForm
+                          loan={row}
+                          onClose={() => setEditingLoanId(null)}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
               {rows.length === 0 ? (
                 <tr>
@@ -323,12 +351,6 @@ export function LoanTable({loanType, rows, count}: Props) {
           onClose={() => setSelectedLoanId(null)}
         />
       )}
-
-      {editingLoan ? (
-        <div className="mt-4">
-          <LoanEditForm loan={editingLoan} onClose={() => setEditingLoan(null)} />
-        </div>
-      ) : null}
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
