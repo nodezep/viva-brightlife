@@ -526,19 +526,38 @@ export async function getAdmissionGroups(): Promise<AdmissionGroup[]> {
 
 export async function getAdmissionBookRows(): Promise<AdmissionBookRow[]> {
   const supabase = createClient();
-  let {data, error} = await supabase
+  type AdmissionRow = {
+    group_id: string;
+    groups: {group_name: string; group_number: string} | null;
+    members:
+      | {
+          id: string;
+          member_number: string;
+          full_name: string;
+          phone: string | null;
+          admission_books?: {has_book: boolean}[] | null;
+        }
+      | null;
+  };
+
+  let data: AdmissionRow[] | null = null;
+  let error: unknown = null;
+
+  const primary = await supabase
     .from('group_members')
     .select(
       'group_id,groups(group_name,group_number),members(id,member_number,full_name,phone,admission_books(has_book))'
     )
     .order('created_at', {ascending: true});
+  data = primary.data as AdmissionRow[] | null;
+  error = primary.error;
 
   if (error || !data) {
     const fallback = await supabase
       .from('group_members')
       .select('group_id,groups(group_name,group_number),members(id,member_number,full_name,phone)')
       .order('created_at', {ascending: true});
-    data = fallback.data;
+    data = fallback.data as AdmissionRow[] | null;
     error = fallback.error;
   }
 
@@ -546,13 +565,7 @@ export async function getAdmissionBookRows(): Promise<AdmissionBookRow[]> {
     return [];
   }
 
-  return (data as unknown as Array<{
-    group_id: string;
-    groups: {group_name: string; group_number: string} | null;
-    members:
-      | {id: string; member_number: string; full_name: string; phone: string | null; admission_books?: {has_book: boolean}[] | null}
-      | null;
-  }>).map((row) => ({
+  return data.map((row) => ({
     groupId: row.group_id,
     groupName: row.groups?.group_name ?? '-',
     groupNumber: row.groups?.group_number ?? '-',
