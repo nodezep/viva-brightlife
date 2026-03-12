@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import {useState} from 'react';
-import {Plus} from 'lucide-react';
+import {Plus, Trash2} from 'lucide-react';
 import {Link} from '@/lib/navigation';
 import type {GroupSummary} from '@/lib/data';
 
@@ -13,9 +13,10 @@ export function GroupsListModule({initialGroups}: Props) {
   const [groups, setGroups] = useState<GroupSummary[]>(initialGroups);
   const [groupName, setGroupName] = useState('');
   const [groupNumber, setGroupNumber] = useState('');
-  const [groupType, setGroupType] = useState('Wakina Mama');
   const [error, setError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
   const createGroup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -25,7 +26,7 @@ export function GroupsListModule({initialGroups}: Props) {
     const response = await fetch('/api/groups', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({groupName, groupNumber, groupType})
+      body: JSON.stringify({groupName, groupNumber})
     });
 
     const result = await response.json();
@@ -58,15 +59,38 @@ export function GroupsListModule({initialGroups}: Props) {
 
     setGroupName('');
     setGroupNumber('');
-    setGroupType('Wakina Mama');
     setSubmitting(false);
+  };
+
+  const deleteGroup = async (groupId: string, groupNameLabel: string) => {
+    const confirmed = window.confirm(
+      `Delete "${groupNameLabel}"? This will remove the group and all its members from it.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingGroupId(groupId);
+    setDeleteError('');
+
+    const response = await fetch(`/api/groups/${groupId}`, {method: 'DELETE'});
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setDeleteError(result.error?.message ?? result.error ?? 'Failed to delete group');
+      setDeletingGroupId(null);
+      return;
+    }
+
+    setGroups((current) => current.filter((group) => group.id !== groupId));
+    setDeletingGroupId(null);
   };
 
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-semibold">Mikopo ya Vikundi vya Wakina Mama</h1>
 
-      <form onSubmit={createGroup} className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-4">
+      <form onSubmit={createGroup} className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-3">
         <input
           className="rounded-lg border bg-background px-3 py-2 text-sm"
           placeholder="Group Name"
@@ -81,13 +105,6 @@ export function GroupsListModule({initialGroups}: Props) {
           onChange={(e) => setGroupNumber(e.target.value)}
           required
         />
-        <input
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          placeholder="Group Type"
-          value={groupType}
-          onChange={(e) => setGroupType(e.target.value)}
-          required
-        />
         <button
           type="submit"
           disabled={submitting}
@@ -96,9 +113,13 @@ export function GroupsListModule({initialGroups}: Props) {
           <Plus size={16} /> {submitting ? 'Saving...' : 'Add Group'}
         </button>
         {error ? (
-          <p className="md:col-span-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          <p className="md:col-span-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : null}
       </form>
+
+      {deleteError ? (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>
+      ) : null}
 
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full min-w-[900px] text-sm">
@@ -107,7 +128,6 @@ export function GroupsListModule({initialGroups}: Props) {
               <th className="px-3 py-2">#</th>
               <th className="px-3 py-2">Group Number</th>
               <th className="px-3 py-2">Group Name</th>
-              <th className="px-3 py-2">Group Type</th>
               <th className="px-3 py-2">Members</th>
               <th className="px-3 py-2">Created</th>
               <th className="px-3 py-2">Actions</th>
@@ -119,22 +139,32 @@ export function GroupsListModule({initialGroups}: Props) {
                 <td className="px-3 py-2">{index + 1}</td>
                 <td className="px-3 py-2">{group.groupNumber}</td>
                 <td className="px-3 py-2">{group.groupName}</td>
-                <td className="px-3 py-2">{group.groupType}</td>
                 <td className="px-3 py-2">{group.memberCount}</td>
                 <td className="px-3 py-2">{new Date(group.createdAt).toLocaleDateString()}</td>
                 <td className="px-3 py-2">
-                  <Link
-                    href={`/mikopo-vikundi-wakinamama/${group.id}`}
-                    className="rounded-md border px-2 py-1 text-xs"
-                  >
-                    Open Group
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/mikopo-vikundi-wakinamama/${group.id}`}
+                      className="rounded-md border px-2 py-1 text-xs"
+                    >
+                      Open Group
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={deletingGroupId === group.id}
+                      onClick={() => void deleteGroup(group.id, group.groupName)}
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-red-700 disabled:opacity-60"
+                    >
+                      <Trash2 size={12} />
+                      {deletingGroupId === group.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {groups.length === 0 ? (
               <tr>
-                <td className="px-3 py-6 text-center text-muted-foreground" colSpan={7}>
+                <td className="px-3 py-6 text-center text-muted-foreground" colSpan={6}>
                   No groups found.
                 </td>
               </tr>

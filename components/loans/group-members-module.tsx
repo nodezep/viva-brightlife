@@ -92,7 +92,7 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
             <ArrowLeft size={14} /> Back to Groups
           </Link>
           <h1 className="text-xl font-semibold">{group.groupName}</h1>
-          <p className="text-sm text-muted-foreground">{group.groupNumber} • {group.groupType}</p>
+          <p className="text-sm text-muted-foreground">{group.groupNumber}</p>
         </div>
         <div className="flex gap-2">
           <button

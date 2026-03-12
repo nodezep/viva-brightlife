@@ -5,7 +5,7 @@ import {createClient} from '@/lib/supabase/server';
 const createGroupSchema = z.object({
   groupName: z.string().min(2),
   groupNumber: z.string().min(2),
-  groupType: z.string().min(2)
+  groupType: z.string().min(2).optional()
 });
 
 export async function POST(request: NextRequest) {
@@ -26,13 +26,14 @@ export async function POST(request: NextRequest) {
   }
 
   const {groupName, groupNumber, groupType} = parsed.data;
+  const resolvedGroupType = groupType ?? 'Wakina Mama';
 
   const {data, error} = await supabase
     .from('groups')
     .insert({
       group_name: groupName,
       group_number: groupNumber,
-      group_type: groupType
+      group_type: resolvedGroupType
     })
     .select('id,group_name,group_number,group_type,created_at')
     .single();

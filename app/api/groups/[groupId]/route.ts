@@ -1,0 +1,52 @@
+import {NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+
+export async function DELETE(
+  _request: Request,
+  {params}: {params: {groupId: string}}
+) {
+  const supabase = createClient();
+  const {
+    data: {user}
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({error: 'Unauthorized'}, {status: 401});
+  }
+
+  const {count: loanCount, error: loanError} = await supabase
+    .from('loans')
+    .select('id', {count: 'exact', head: true})
+    .eq('group_id', params.groupId);
+
+  if (loanError) {
+    return NextResponse.json({error: loanError.message}, {status: 400});
+  }
+
+  if ((loanCount ?? 0) > 0) {
+    return NextResponse.json(
+      {error: 'Cannot delete a group with active loans.'},
+      {status: 400}
+    );
+  }
+
+  const {error: membersError} = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', params.groupId);
+
+  if (membersError) {
+    return NextResponse.json({error: membersError.message}, {status: 400});
+  }
+
+  const {error: groupError} = await supabase
+    .from('groups')
+    .delete()
+    .eq('id', params.groupId);
+
+  if (groupError) {
+    return NextResponse.json({error: groupError.message}, {status: 400});
+  }
+
+  return NextResponse.json({ok: true});
+}
