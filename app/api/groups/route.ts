@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
   const parsed = createGroupSchema.safeParse(payload);
 
   if (!parsed.success) {
-    return NextResponse.json({error: parsed.error.flatten()}, {status: 400});
+    return NextResponse.json(
+      {error: 'Invalid group details.', details: parsed.error.flatten()},
+      {status: 400}
+    );
   }
 
   const {groupName, groupNumber, groupType} = parsed.data;

@@ -32,7 +32,12 @@ export function GroupsListModule({initialGroups}: Props) {
     const result = await response.json();
 
     if (!response.ok) {
-      setError(result.error?.message ?? result.error ?? 'Failed to create group');
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message ??
+            (result.error ? JSON.stringify(result.error) : null);
+      setError(message ?? 'Failed to create group');
       setSubmitting(false);
       return;
     }
@@ -77,7 +82,12 @@ export function GroupsListModule({initialGroups}: Props) {
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      setDeleteError(result.error?.message ?? result.error ?? 'Failed to delete group');
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message ??
+            (result.error ? JSON.stringify(result.error) : null);
+      setDeleteError(message ?? 'Failed to delete group');
       setDeletingGroupId(null);
       return;
     }
