@@ -35,10 +35,11 @@ const iconMap = {
 
 type Props = {
   open: boolean;
+  collapsed: boolean;
   onClose: () => void;
 };
 
-export function Sidebar({open, onClose}: Props) {
+export function Sidebar({open, collapsed, onClose}: Props) {
   const t = useTranslations('navigation');
   const pathname = usePathname();
 
@@ -53,7 +54,8 @@ export function Sidebar({open, onClose}: Props) {
       />
       <aside
         className={cn(
-          'no-print fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] w-72 border-r bg-card transition-transform lg:translate-x-0',
+          'no-print fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] border-r bg-card transition-transform lg:translate-x-0',
+          collapsed ? 'w-16 lg:w-16' : 'w-72 lg:w-72',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -70,14 +72,16 @@ export function Sidebar({open, onClose}: Props) {
               <Link
                 key={item.href}
                 href={item.href}
+                title={t(item.key)}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+                  collapsed ? 'justify-center px-2' : '',
                   active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
                 )}
                 onClick={onClose}
               >
                 <Icon size={16} />
-                <span>{t(item.key)}</span>
+                <span className={collapsed ? 'hidden' : ''}>{t(item.key)}</span>
               </Link>
             );
           })}

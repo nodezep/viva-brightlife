@@ -17,6 +17,7 @@ export function GroupLoanForm({groupId, members, onClose}: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState('');
+  const eligibleMembers = members.filter((member) => member.hasBook);
 
   const [totalRepay, setTotalRepay] = useState('');
   const [durationWeeks, setDurationWeeks] = useState('');
@@ -62,12 +63,17 @@ export function GroupLoanForm({groupId, members, onClose}: Props) {
         name="memberId"
       >
         <option value="">Select member</option>
-        {members.map((member) => (
+        {eligibleMembers.map((member) => (
           <option key={member.memberId} value={member.memberId}>
             {member.memberNumber} - {member.fullName} {member.phone ? `(${member.phone})` : ''}
           </option>
         ))}
       </select>
+      {eligibleMembers.length === 0 ? (
+        <p className="md:col-span-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          No members approved in the Admission Book for this group yet.
+        </p>
+      ) : null}
 
       <input
         required

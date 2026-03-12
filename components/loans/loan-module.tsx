@@ -15,12 +15,21 @@ type Props = {
   startDate: string;
   endDate: string;
   page: number;
-  sort: string;
+  sort?: string;
 };
 
 export async function LoanModule({loanType, title, query, startDate, endDate, page, sort}: Props) {
   const t = await getTranslations();
-  const {data: rows, count} = await getLoansByType(loanType, query, startDate, endDate, page, sort as any);
+  const defaultSort = loanType === 'binafsi' ? 'sno_asc' : 'newest';
+  const activeSort = sort || defaultSort;
+  const {data: rows, count} = await getLoansByType(
+    loanType,
+    query,
+    startDate,
+    endDate,
+    page,
+    activeSort as any
+  );
 
   return (
     <section className="space-y-4 relative w-full">
@@ -31,7 +40,7 @@ export async function LoanModule({loanType, title, query, startDate, endDate, pa
         </div>
         
         <div className="min-w-[280px] flex-1 max-w-4xl">
-          <LoanFilters />
+          <LoanFilters defaultSort={defaultSort} />
         </div>
 
         <div className="no-print flex gap-2">

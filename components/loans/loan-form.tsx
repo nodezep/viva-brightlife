@@ -25,10 +25,12 @@ export function LoanForm({loanType, onClose}: Props) {
 
   // Individual loan (binafsi) states
   const [principal, setPrincipal] = useState('');
+  const [principalDisplay, setPrincipalDisplay] = useState('');
   const [disbursementDate, setDisbursementDate] = useState('');
   const [durationMonths, setDurationMonths] = useState('');
   const [interestRate, setInterestRate] = useState('');
   const [amountPaid, setAmountPaid] = useState('');
+  const [amountPaidDisplay, setAmountPaidDisplay] = useState('');
   const [daysOverdue, setDaysOverdue] = useState('');
   const [memberSerial, setMemberSerial] = useState('');
   const [memberPhone, setMemberPhone] = useState('');
@@ -63,7 +65,7 @@ export function LoanForm({loanType, onClose}: Props) {
   };
 
   const durationMonthsValue = Number(durationMonths) || 0;
-  const loanNumber = memberSerial ? `BIN-${memberSerial}` : '';
+  const loanNumber = memberSerial ? memberSerial : '';
 
   return (
     <form
@@ -88,13 +90,18 @@ export function LoanForm({loanType, onClose}: Props) {
           />
           <input
             required
-            type="number"
+            type="text"
+            inputMode="numeric"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             placeholder="Kiasi cha Mkopo"
-            name="disbursementAmount"
-            value={principal}
-            onChange={(e) => setPrincipal(e.target.value)}
+            value={principalDisplay}
+            onChange={(e) => {
+              const raw = stripNumber(e.target.value);
+              setPrincipal(raw);
+              setPrincipalDisplay(formatNumber(raw));
+            }}
           />
+          <input type="hidden" name="disbursementAmount" value={principal} />
           <input
             required
             type="date"
@@ -114,7 +121,8 @@ export function LoanForm({loanType, onClose}: Props) {
           />
           <input
             required
-            type="number"
+            type="text"
+            inputMode="decimal"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             placeholder="Asilimia ya Riba"
             name="interestRate"
@@ -133,14 +141,19 @@ export function LoanForm({loanType, onClose}: Props) {
             min={1}
           />
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             placeholder="Malipo ya Mkopo"
-            name="amountPaid"
-            value={amountPaid}
-            onChange={(e) => setAmountPaid(e.target.value)}
+            value={amountPaidDisplay}
+            onChange={(e) => {
+              const raw = stripNumber(e.target.value);
+              setAmountPaid(raw);
+              setAmountPaidDisplay(formatNumber(raw));
+            }}
             min={0}
           />
+          <input type="hidden" name="amountPaid" value={amountPaid} />
           <input
             type="tel"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
@@ -290,3 +303,12 @@ export function LoanForm({loanType, onClose}: Props) {
     </form>
   );
 }
+  const stripNumber = (value: string) =>
+    value.replace(/,/g, '').replace(/[^\d.]/g, '');
+
+  const formatNumber = (value: string) => {
+    if (!value) return '';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return '';
+    return new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(numeric);
+  };

@@ -351,6 +351,7 @@ export type GroupMemberDetail = {
   fullName: string;
   phone: string | null;
   roleInGroup: string | null;
+  hasBook: boolean;
 };
 
 export type GroupDetail = {
@@ -392,13 +393,25 @@ export async function getGroupsSummary(): Promise<GroupSummary[]> {
 
 export async function getGroupDetail(groupId: string): Promise<GroupDetail | null> {
   const supabase = createClient();
-  const {data, error} = await supabase
+  const baseSelect =
+    'id,group_name,group_number,group_type,created_at,group_members(id,role_in_group,members(id,member_number,full_name,phone,admission_books(has_book)))';
+  let {data, error} = await supabase
     .from('groups')
-    .select(
-      'id,group_name,group_number,group_type,created_at,group_members(id,role_in_group,members(id,member_number,full_name,phone))'
-    )
+    .select(baseSelect)
     .eq('id', groupId)
     .single();
+
+  if (error || !data) {
+    const fallback = await supabase
+      .from('groups')
+      .select(
+        'id,group_name,group_number,group_type,created_at,group_members(id,role_in_group,members(id,member_number,full_name,phone))'
+      )
+      .eq('id', groupId)
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) {
     return null;
@@ -408,8 +421,8 @@ export async function getGroupDetail(groupId: string): Promise<GroupDetail | nul
     id: string;
     role_in_group: string | null;
     members:
-      | {id: string; member_number: string; full_name: string; phone: string | null}
-      | {id: string; member_number: string; full_name: string; phone: string | null}[]
+      | {id: string; member_number: string; full_name: string; phone: string | null; admission_books?: {has_book: boolean}[] | null}
+      | {id: string; member_number: string; full_name: string; phone: string | null; admission_books?: {has_book: boolean}[] | null}[]
       | null;
   }>)
     .map((row) => {
@@ -424,7 +437,8 @@ export async function getGroupDetail(groupId: string): Promise<GroupDetail | nul
         memberNumber: member.member_number,
         fullName: member.full_name,
         phone: member.phone ?? null,
-        roleInGroup: row.role_in_group
+        roleInGroup: row.role_in_group,
+        hasBook: Boolean(member.admission_books?.[0]?.has_book)
       };
     })
     .filter((row): row is GroupMemberDetail => Boolean(row));
@@ -473,6 +487,81 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   }
 
   return (data as unknown as LoanRow[]).map(toLoanRecord);
+}
+
+export type AdmissionBookRow = {
+  groupId: string;
+  groupName: string;
+  groupNumber: string;
+  memberId: string;
+  memberNumber: string;
+  fullName: string;
+  phone: string | null;
+  hasBook: boolean;
+};
+
+export type AdmissionGroup = {
+  id: string;
+  name: string;
+  number: string;
+};
+
+export async function getAdmissionGroups(): Promise<AdmissionGroup[]> {
+  const supabase = createClient();
+  const {data, error} = await supabase
+    .from('groups')
+    .select('id,group_name,group_number')
+    .order('group_name', {ascending: true});
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.map((group) => ({
+    id: group.id,
+    name: group.group_name,
+    number: group.group_number
+  }));
+}
+
+export async function getAdmissionBookRows(): Promise<AdmissionBookRow[]> {
+  const supabase = createClient();
+  let {data, error} = await supabase
+    .from('group_members')
+    .select(
+      'group_id,groups(group_name,group_number),members(id,member_number,full_name,phone,admission_books(has_book))'
+    )
+    .order('created_at', {ascending: true});
+
+  if (error || !data) {
+    const fallback = await supabase
+      .from('group_members')
+      .select('group_id,groups(group_name,group_number),members(id,member_number,full_name,phone)')
+      .order('created_at', {ascending: true});
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as unknown as Array<{
+    group_id: string;
+    groups: {group_name: string; group_number: string} | null;
+    members:
+      | {id: string; member_number: string; full_name: string; phone: string | null; admission_books?: {has_book: boolean}[] | null}
+      | null;
+  }>).map((row) => ({
+    groupId: row.group_id,
+    groupName: row.groups?.group_name ?? '-',
+    groupNumber: row.groups?.group_number ?? '-',
+    memberId: row.members?.id ?? '',
+    memberNumber: row.members?.member_number ?? '-',
+    fullName: row.members?.full_name ?? '-',
+    phone: row.members?.phone ?? null,
+    hasBook: Boolean(row.members?.admission_books?.[0]?.has_book)
+  }));
 }
 
 export type InsuranceView = {

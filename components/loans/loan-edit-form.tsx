@@ -23,6 +23,7 @@ export function LoanEditForm({loan, onClose}: Props) {
   const [installment, setInstallment] = useState(String(loan.installmentSize ?? ''));
 
   const [principal, setPrincipal] = useState(String(loan.disbursementAmount ?? ''));
+  const [principalDisplay, setPrincipalDisplay] = useState('');
   const [disbursementDate, setDisbursementDate] = useState(loan.disbursementDate ?? '');
   const [durationMonths, setDurationMonths] = useState(
     loan.durationMonths ? String(loan.durationMonths) : ''
@@ -42,10 +43,29 @@ export function LoanEditForm({loan, onClose}: Props) {
   const [amountPaid, setAmountPaid] = useState(
     loan.amountPaid ? String(loan.amountPaid) : ''
   );
+  const [amountPaidDisplay, setAmountPaidDisplay] = useState('');
   const [memberPhone, setMemberPhone] = useState(loan.memberPhone ?? '');
   const [daysOverdue, setDaysOverdue] = useState(
     loan.daysOverdue ? String(loan.daysOverdue) : ''
   );
+
+  const stripNumber = (value: string) =>
+    value.replace(/,/g, '').replace(/[^\d.]/g, '');
+
+  const formatNumber = (value: string) => {
+    if (!value) return '';
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return '';
+    return new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(numeric);
+  };
+
+  useEffect(() => {
+    setPrincipalDisplay(formatNumber(principal));
+  }, [principal]);
+
+  useEffect(() => {
+    setAmountPaidDisplay(formatNumber(amountPaid));
+  }, [amountPaid]);
 
   useEffect(() => {
     const repayVal = Number(totalRepay);
@@ -58,7 +78,7 @@ export function LoanEditForm({loan, onClose}: Props) {
   }, [totalRepay, durationWeeks]);
 
   const durationMonthsValue = Number(durationMonths) || 0;
-  const loanNumber = loan.loanNumber || (memberSerial ? `BIN-${memberSerial}` : '');
+  const loanNumber = loan.loanNumber || (memberSerial ? memberSerial : '');
 
   const handleSubmit = (formData: FormData) => {
     setError(null);
@@ -98,13 +118,18 @@ export function LoanEditForm({loan, onClose}: Props) {
           />
           <input
             required
-            type="number"
+            type="text"
+            inputMode="numeric"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             placeholder="Kiasi cha Mkopo"
-            name="disbursementAmount"
-            value={principal}
-            onChange={(e) => setPrincipal(e.target.value)}
+            value={principalDisplay}
+            onChange={(e) => {
+              const raw = stripNumber(e.target.value);
+              setPrincipal(raw);
+              setPrincipalDisplay(formatNumber(raw));
+            }}
           />
+          <input type="hidden" name="disbursementAmount" value={principal} />
           <input
             required
             type="date"
@@ -124,7 +149,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           />
           <input
             required
-            type="number"
+            type="text"
+            inputMode="decimal"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             placeholder="Asilimia ya Riba"
             name="interestRate"
@@ -143,14 +169,19 @@ export function LoanEditForm({loan, onClose}: Props) {
             min={1}
           />
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             className="rounded-lg border bg-background px-3 py-2 text-sm"
             placeholder="Malipo ya Mkopo"
-            name="amountPaid"
-            value={amountPaid}
-            onChange={(e) => setAmountPaid(e.target.value)}
+            value={amountPaidDisplay}
+            onChange={(e) => {
+              const raw = stripNumber(e.target.value);
+              setAmountPaid(raw);
+              setAmountPaidDisplay(formatNumber(raw));
+            }}
             min={0}
           />
+          <input type="hidden" name="amountPaid" value={amountPaid} />
           <input
             type="tel"
             className="rounded-lg border bg-background px-3 py-2 text-sm"

@@ -14,6 +14,7 @@ export const navItems: NavItem[] = [
     icon: 'HandHeart'
   },
   {key: 'mikopo_vyombo_moto', href: '/mikopo-vyombo-moto', icon: 'Bike'},
+  {key: 'admission_book', href: '/admission-book', icon: 'FileSpreadsheet'},
   {key: 'ripoti', href: '/ripoti', icon: 'FileSpreadsheet'},
   {key: 'sms_reminders', href: '/sms-reminders', icon: 'MessageSquare'}
 ];

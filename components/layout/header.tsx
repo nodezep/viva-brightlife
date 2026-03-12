@@ -1,6 +1,6 @@
 'use client';
 
-import {Menu, UserCircle2} from 'lucide-react';
+import {Menu, PanelLeftClose, PanelLeftOpen, UserCircle2} from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import {LanguageToggle} from './language-toggle';
 import {ThemeToggle} from './theme-toggle';
@@ -10,10 +10,12 @@ import {BrandLogo} from './brand-logo';
 
 type Props = {
   onToggleSidebar: () => void;
+  onToggleCollapse: () => void;
+  collapsed: boolean;
   adminEmail: string;
 };
 
-export function Header({onToggleSidebar, adminEmail}: Props) {
+export function Header({onToggleSidebar, onToggleCollapse, collapsed, adminEmail}: Props) {
   const t = useTranslations();
   const router = useRouter();
 
@@ -36,6 +38,14 @@ export function Header({onToggleSidebar, adminEmail}: Props) {
             aria-label="toggle sidebar"
           >
             <Menu size={18} />
+          </button>
+          <button
+            type="button"
+            className="hidden rounded-lg border p-2 lg:inline-flex"
+            onClick={onToggleCollapse}
+            aria-label="toggle sidebar collapse"
+          >
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
           <div>
             <div className="flex items-center gap-3">

@@ -80,7 +80,8 @@ export function GroupMembersModule({group, loans}: Props) {
           memberNumber: created.member_number,
           fullName: created.full_name,
           phone: created.phone ?? null,
-          roleInGroup: newMemberRole
+          roleInGroup: newMemberRole,
+          hasBook: false
         }
       ]);
     }

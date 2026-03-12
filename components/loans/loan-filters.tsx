@@ -5,7 +5,11 @@ import {Search} from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import {useCallback, useTransition, useState} from 'react';
 
-export function LoanFilters() {
+type Props = {
+  defaultSort?: string;
+};
+
+export function LoanFilters({defaultSort = 'newest'}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -15,7 +19,7 @@ export function LoanFilters() {
   const [query, setQuery] = useState(searchParams.get('query') || '');
   const [startDate, setStartDate] = useState(searchParams.get('startDate') || '');
   const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
-  const [sort, setSort] = useState(searchParams.get('sort') || 'newest');
+  const [sort, setSort] = useState(searchParams.get('sort') || defaultSort);
 
   const applyFilters = useCallback(
     (newQuery: string, newStart: string, newEnd: string, newSort: string) => {

@@ -150,7 +150,7 @@ export function GroupsListModule({initialGroups}: Props) {
                   <div className="flex flex-wrap gap-2">
                     <Link
                       href={`/mikopo-vikundi-wakinamama/${group.id}`}
-                      className="rounded-md border px-2 py-1 text-xs"
+                      className="rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
                     >
                       Open Group
                     </Link>
