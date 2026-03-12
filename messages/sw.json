@@ -65,7 +65,13 @@
     "total_collections": "Jumla ya Makusanyo",
     "overdue_loans": "Mikopo Iliyochelewa",
     "active_members": "Wanachama Hai",
-    "active_groups": "Vikundi Hai"
+    "active_groups": "Vikundi Hai",
+    "portfolio_breakdown": "Mkopo kwa Makundi",
+    "portfolio_title": "Mgawanyo wa Mikopo kwa Aina",
+    "portfolio_hint": "Bofya kadi yoyote kufungua moduli husika.",
+    "active_short": "hai",
+    "total_loans": "Jumla ya Mikopo",
+    "outstanding_balance": "Salio Linalodaiwa"
   },
   "loan": {
     "search_placeholder": "Tafuta kwa jina la mwanachama au namba ya mkopo",

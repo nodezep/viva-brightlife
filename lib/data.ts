@@ -250,7 +250,8 @@ export async function getDashboardMetrics() {
     {data: schedulePaidRows},
     {data: overdueScheduleRows},
     {count: members},
-    {count: groups}
+    {count: groups},
+    {data: loanTypeRows}
   ] = await Promise.all([
     supabase
       .from('loans')
@@ -271,7 +272,10 @@ export async function getDashboardMetrics() {
       .select('loan_id, expected_amount, paid_amount, expected_date')
       .lt('expected_date', today),
     supabase.from('members').select('*', {count: 'exact', head: true}),
-    supabase.from('groups').select('*', {count: 'exact', head: true})
+    supabase.from('groups').select('*', {count: 'exact', head: true}),
+    supabase
+      .from('loans')
+      .select('loan_type,status,principal_amount,outstanding_balance')
   ]);
 
   const totalDisbursedThisMonth = (disbursedRows ?? []).reduce(
@@ -299,7 +303,38 @@ export async function getDashboardMetrics() {
     totalCollections,
     overdueLoans: overdueLoanIds.size,
     activeMembers: members ?? 0,
-    activeGroups: groups ?? 0
+    activeGroups: groups ?? 0,
+    loanTypeMetrics: (loanTypeRows ?? []).reduce(
+      (acc, row) => {
+        const type = row.loan_type as LoanType;
+        if (!acc[type]) {
+          acc[type] = {
+            loanType: type,
+            totalCount: 0,
+            activeCount: 0,
+            disbursedAmount: 0,
+            outstandingBalance: 0
+          };
+        }
+        acc[type].totalCount += 1;
+        if (row.status === 'active') {
+          acc[type].activeCount += 1;
+        }
+        acc[type].disbursedAmount += Number(row.principal_amount ?? 0);
+        acc[type].outstandingBalance += Number(row.outstanding_balance ?? 0);
+        return acc;
+      },
+      {} as Record<
+        LoanType,
+        {
+          loanType: LoanType;
+          totalCount: number;
+          activeCount: number;
+          disbursedAmount: number;
+          outstandingBalance: number;
+        }
+      >
+    )
   };
 }
 

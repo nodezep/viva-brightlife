@@ -48,6 +48,20 @@ export function LoanEditForm({loan, onClose}: Props) {
   const [daysOverdue, setDaysOverdue] = useState(
     loan.daysOverdue ? String(loan.daysOverdue) : ''
   );
+  const [disbursementAmount, setDisbursementAmount] = useState(
+    loan.disbursementAmount ? String(loan.disbursementAmount) : ''
+  );
+  const [disbursementAmountDisplay, setDisbursementAmountDisplay] = useState('');
+  const [securityAmount, setSecurityAmount] = useState(
+    loan.securityAmount ? String(loan.securityAmount) : ''
+  );
+  const [securityAmountDisplay, setSecurityAmountDisplay] = useState('');
+  const [overdueAmount, setOverdueAmount] = useState(
+    loan.overdueAmount ? String(loan.overdueAmount) : ''
+  );
+  const [overdueAmountDisplay, setOverdueAmountDisplay] = useState('');
+  const [installmentDisplay, setInstallmentDisplay] = useState('');
+  const [totalRepayDisplay, setTotalRepayDisplay] = useState('');
 
   const stripNumber = (value: string) =>
     value.replace(/,/g, '').replace(/[^\d.]/g, '');
@@ -76,6 +90,26 @@ export function LoanEditForm({loan, onClose}: Props) {
       setInstallment(suggested.toString());
     }
   }, [totalRepay, durationWeeks]);
+
+  useEffect(() => {
+    setDisbursementAmountDisplay(formatNumber(disbursementAmount));
+  }, [disbursementAmount]);
+
+  useEffect(() => {
+    setSecurityAmountDisplay(formatNumber(securityAmount));
+  }, [securityAmount]);
+
+  useEffect(() => {
+    setOverdueAmountDisplay(formatNumber(overdueAmount));
+  }, [overdueAmount]);
+
+  useEffect(() => {
+    setInstallmentDisplay(formatNumber(installment));
+  }, [installment]);
+
+  useEffect(() => {
+    setTotalRepayDisplay(formatNumber(totalRepay));
+  }, [totalRepay]);
 
   const durationMonthsValue = Number(durationMonths) || 0;
   const loanNumber = loan.loanNumber || (memberSerial ? memberSerial : '');
@@ -221,12 +255,18 @@ export function LoanEditForm({loan, onClose}: Props) {
       />
       <input
         required
-        type="number"
+        type="text"
+        inputMode="numeric"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         placeholder={t('table.disbursement_amount') || 'Disbursement Amount'}
-        name="disbursementAmount"
-        defaultValue={loan.disbursementAmount}
+        value={disbursementAmountDisplay}
+        onChange={(e) => {
+          const raw = stripNumber(e.target.value);
+          setDisbursementAmount(raw);
+          setDisbursementAmountDisplay(formatNumber(raw));
+        }}
       />
+      <input type="hidden" name="disbursementAmount" value={disbursementAmount} />
       <input
         required
         type="date"
@@ -235,12 +275,18 @@ export function LoanEditForm({loan, onClose}: Props) {
         defaultValue={loan.disbursementDate}
       />
       <input
-        type="number"
+        type="text"
+        inputMode="numeric"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         placeholder={t('table.security_amount') || 'Security Amount'}
-        name="securityAmount"
-        defaultValue={loan.securityAmount}
+        value={securityAmountDisplay}
+        onChange={(e) => {
+          const raw = stripNumber(e.target.value);
+          setSecurityAmount(raw);
+          setSecurityAmountDisplay(formatNumber(raw));
+        }}
       />
+      <input type="hidden" name="securityAmount" value={securityAmount} />
       <input
         required
         type="number"
@@ -251,13 +297,18 @@ export function LoanEditForm({loan, onClose}: Props) {
       />
       <input
         required
-        type="number"
+        type="text"
+        inputMode="numeric"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         placeholder="Total Expected Repayment (OS Balance)"
-        name="outstandingBalance"
-        value={totalRepay}
-        onChange={(e) => setTotalRepay(e.target.value)}
+        value={totalRepayDisplay}
+        onChange={(e) => {
+          const raw = stripNumber(e.target.value);
+          setTotalRepay(raw);
+          setTotalRepayDisplay(formatNumber(raw));
+        }}
       />
+      <input type="hidden" name="outstandingBalance" value={totalRepay} />
       <input
         type="number"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
@@ -268,20 +319,31 @@ export function LoanEditForm({loan, onClose}: Props) {
       />
       <input
         required
-        type="number"
+        type="text"
+        inputMode="numeric"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         placeholder={t('table.installment_size') || 'Installment Size'}
-        name="installmentSize"
-        value={installment}
-        onChange={(e) => setInstallment(e.target.value)}
+        value={installmentDisplay}
+        onChange={(e) => {
+          const raw = stripNumber(e.target.value);
+          setInstallment(raw);
+          setInstallmentDisplay(formatNumber(raw));
+        }}
       />
+      <input type="hidden" name="installmentSize" value={installment} />
       <input
-        type="number"
+        type="text"
+        inputMode="numeric"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         placeholder={t('table.overdue_od') || 'Overdue OD'}
-        name="overdueAmount"
-        defaultValue={loan.overdueAmount}
+        value={overdueAmountDisplay}
+        onChange={(e) => {
+          const raw = stripNumber(e.target.value);
+          setOverdueAmount(raw);
+          setOverdueAmountDisplay(formatNumber(raw));
+        }}
       />
+      <input type="hidden" name="overdueAmount" value={overdueAmount} />
         </>
       )}
 

@@ -1,12 +1,14 @@
 'use client';
 
 import {useState} from 'react';
-import {ArrowLeft, Plus, Trash2} from 'lucide-react';
+import {ArrowLeft, Download, Plus, Printer, Trash2} from 'lucide-react';
 import {useRouter} from '@/lib/navigation';
 import type {GroupDetail, GroupMemberDetail} from '@/lib/data';
 import type {LoanRecord} from '@/types';
 import {LoanTable} from './loan-table';
 import {GroupLoanFormDialog} from './group-loan-form-dialog';
+import {getLoanSchedulesAction} from '@/lib/actions/loan-schedules';
+import ExcelJS from 'exceljs';
 
 type Props = {
   group: GroupDetail;
@@ -30,6 +32,11 @@ export function GroupMembersModule({group, loans}: Props) {
   const [editPhone, setEditPhone] = useState('');
   const [editRole, setEditRole] = useState('Member');
   const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+  const [exportMonth, setExportMonth] = useState(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${now.getFullYear()}-${month}`;
+  });
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -185,6 +192,140 @@ export function GroupMembersModule({group, loans}: Props) {
     router.refresh();
   };
 
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(value);
+
+  const buildScheduleColumns = (schedulesByLoan: Map<string, any[]>) => {
+    const [year, month] = exportMonth.split('-').map(Number);
+    if (!year || !month) {
+      return [];
+    }
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    const dates = new Set<string>();
+    schedulesByLoan.forEach((schedules) => {
+      schedules.forEach((schedule) => {
+        const date = schedule.expected_date;
+        if (!date) return;
+        const d = new Date(date);
+        if (d >= start && d <= end) {
+          dates.add(date);
+        }
+      });
+    });
+    const sorted = Array.from(dates).sort().slice(0, 4);
+    while (sorted.length < 4) {
+      sorted.push(`Week ${sorted.length + 1}`);
+    }
+    return sorted;
+  };
+
+  const exportGroupLoans = async () => {
+    if (loans.length === 0) {
+      return;
+    }
+
+    const schedules: Array<[string, any[]]> = await Promise.all(
+      loans.map(async (loan) => {
+        try {
+          const data = await getLoanSchedulesAction(loan.id);
+          return [loan.id, (data ?? []) as any[]];
+        } catch {
+          return [loan.id, []];
+        }
+      })
+    );
+
+    const scheduleMap = new Map(schedules);
+    const columns = buildScheduleColumns(scheduleMap);
+    const rows = loans.map((loan) => ({
+      memberName: loan.memberName,
+      loanNumber: loan.loanNumber,
+      loanAmount: loan.disbursementAmount,
+      installment: loan.installmentSize,
+      outstanding: loan.outstandingBalance,
+      scheduleMap: new Map(
+        (scheduleMap.get(loan.id) ?? []).map((row: any) => [row.expected_date, row])
+      )
+    }));
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Women Group Loans');
+
+    sheet.mergeCells('A1', 'I1');
+    sheet.getCell('A1').value = `Viva Brightlife Microfinance - ${group.groupName}`;
+    sheet.getCell('A1').font = {size: 14, bold: true};
+    sheet.getCell('A1').alignment = {vertical: 'middle'};
+
+    sheet.mergeCells('A2', 'I2');
+    sheet.getCell('A2').value = `Group Number: ${group.groupNumber} | Month: ${exportMonth}`;
+    sheet.getCell('A2').font = {size: 11, color: {argb: '6B7280'}};
+
+    const headerRow = [
+      'Member',
+      'Loan Number',
+      'Loan Amount',
+      'Installment',
+      'OS Balance',
+      ...columns
+    ];
+    const header = sheet.addRow(headerRow);
+    header.font = {bold: true, color: {argb: 'FFFFFF'}};
+    header.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: '1F2937'}};
+    header.alignment = {vertical: 'middle'};
+
+    const numberFormat = '#,##0';
+    rows.forEach((row) => {
+      const scheduleValues = columns.map((date) => {
+        const schedule = row.scheduleMap.get(date);
+        if (!schedule) {
+          return '-';
+        }
+        const value =
+          schedule.paid_amount && schedule.paid_amount > 0
+            ? schedule.paid_amount
+            : schedule.expected_amount ?? 0;
+        return value ? Number(value) : '-';
+      });
+      const dataRow = sheet.addRow([
+        row.memberName,
+        row.loanNumber,
+        Number(row.loanAmount ?? 0),
+        Number(row.installment ?? 0),
+        Number(row.outstanding ?? 0),
+        ...scheduleValues
+      ]);
+
+      dataRow.getCell(3).numFmt = numberFormat;
+      dataRow.getCell(4).numFmt = numberFormat;
+      dataRow.getCell(5).numFmt = numberFormat;
+      scheduleValues.forEach((value, idx) => {
+        if (typeof value === 'number') {
+          dataRow.getCell(6 + idx).numFmt = numberFormat;
+        }
+      });
+    });
+
+    sheet.columns = headerRow.map((label) => ({
+      header: label,
+      key: label,
+      width: Math.max(14, Math.min(24, label.length + 2))
+    }));
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `women-groups-${group.groupName}-${exportMonth}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -228,16 +369,21 @@ export function GroupMembersModule({group, loans}: Props) {
       {view === 'members' ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setShowNewRow((value) => !value)}
-              className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
-            >
-              <Plus size={16} /> {showNewRow ? 'Close Form' : 'Add New Member'}
-            </button>
-            {error ? (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-            ) : null}
+            <p className="text-sm font-medium text-foreground">Group Members</p>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {error ? (
+                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setShowNewRow((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
+              >
+                <Plus size={16} /> {showNewRow ? 'Close Form' : 'Add New Member'}
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-xl border bg-card">
@@ -409,7 +555,31 @@ export function GroupMembersModule({group, loans}: Props) {
         </>
       ) : (
         <>
-          <GroupLoanFormDialog groupId={group.id} members={group.members} />
+          <div className="no-print mb-2 flex flex-wrap items-center justify-between gap-2">
+            <GroupLoanFormDialog groupId={group.id} members={group.members} />
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="month"
+                className="rounded-lg border bg-background px-3 py-2 text-sm"
+                value={exportMonth}
+                onChange={(e) => setExportMonth(e.target.value)}
+              />
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                onClick={() => window.print()}
+              >
+                <Printer size={16} /> Print
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                onClick={() => void exportGroupLoans()}
+              >
+                <Download size={16} /> Export
+              </button>
+            </div>
+          </div>
           <LoanTable loanType="vikundi_wakinamama" rows={loans} count={loans.length} />
         </>
       )}

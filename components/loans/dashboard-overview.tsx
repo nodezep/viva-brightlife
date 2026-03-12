@@ -9,7 +9,9 @@ import {
   Users,
   Wallet2
 } from 'lucide-react';
-import {useTranslations} from 'next-intl';
+import {useLocale, useTranslations} from 'next-intl';
+import Link from 'next/link';
+import type {LoanType} from '@/types';
 import {BrandLogo} from '@/components/layout/brand-logo';
 
 type Props = {
@@ -20,6 +22,16 @@ type Props = {
     overdueLoans: number;
     activeMembers: number;
     activeGroups: number;
+    loanTypeMetrics: Record<
+      LoanType,
+      {
+        loanType: LoanType;
+        totalCount: number;
+        activeCount: number;
+        disbursedAmount: number;
+        outstandingBalance: number;
+      }
+    >;
   };
 };
 
@@ -31,6 +43,8 @@ const currency = new Intl.NumberFormat('en-US', {
 
 export function DashboardOverview({metrics}: Props) {
   const t = useTranslations('dashboard');
+  const nav = useTranslations('navigation');
+  const locale = useLocale();
 
   const stats = useMemo(
     () => [
@@ -58,6 +72,36 @@ export function DashboardOverview({metrics}: Props) {
       {label: t('active_groups'), value: metrics.activeGroups.toString(), icon: Layers3}
     ],
     [metrics, t]
+  );
+
+  const loanTypeCards = useMemo(
+    () => [
+      {type: 'binafsi' as LoanType, label: nav('mikopo_binafsi'), href: '/mikopo-binafsi'},
+      {
+        type: 'biashara' as LoanType,
+        label: nav('mikopo_wafanyabiashara'),
+        href: '/mikopo-wafanyabiashara'
+      },
+      {type: 'watumishi' as LoanType, label: nav('mikopo_watumishi'), href: '/mikopo-watumishi'},
+      {
+        type: 'electronics' as LoanType,
+        label: nav('mikopo_electronics'),
+        href: '/mikopo-electronics'
+      },
+      {type: 'kilimo' as LoanType, label: nav('mikopo_kilimo'), href: '/mikopo-kilimo'},
+      {type: 'bima' as LoanType, label: nav('huduma_bima'), href: '/huduma-bima'},
+      {
+        type: 'vikundi_wakinamama' as LoanType,
+        label: nav('mikopo_vikundi_wakinamama'),
+        href: '/mikopo-vikundi-wakinamama'
+      },
+      {
+        type: 'vyombo_moto' as LoanType,
+        label: nav('mikopo_vyombo_moto'),
+        href: '/mikopo-vyombo-moto'
+      }
+    ],
+    [nav]
   );
 
   return (
@@ -104,6 +148,57 @@ export function DashboardOverview({metrics}: Props) {
           </article>
         ))}
       </div>
+
+      <section className="rounded-2xl border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              {t('portfolio_breakdown')}
+            </p>
+            <h2 className="mt-2 text-lg font-semibold tracking-tight">
+              {t('portfolio_title')}
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">{t('portfolio_hint')}</p>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {loanTypeCards.map((card) => {
+            const metricsForType = metrics.loanTypeMetrics?.[card.type];
+            return (
+              <Link
+                key={card.type}
+                href={`/${locale}${card.href}`}
+                className="group rounded-xl border bg-background p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">{card.label}</p>
+                  <span className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
+                    {metricsForType?.activeCount ?? 0} {t('active_short')}
+                  </span>
+                </div>
+                <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span>{t('total_loans')}</span>
+                    <span className="text-foreground">
+                      {metricsForType?.totalCount ?? 0}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>{t('outstanding_balance')}</span>
+                    <span className="text-foreground">
+                      {currency.format(metricsForType?.outstandingBalance ?? 0)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full w-2/3 rounded-full bg-primary/30 transition-all group-hover:w-5/6" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </section>
   );
 }

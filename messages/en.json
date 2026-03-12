@@ -65,7 +65,13 @@
     "total_collections": "Total Collections",
     "overdue_loans": "Overdue Loans",
     "active_members": "Active Members",
-    "active_groups": "Active Groups"
+    "active_groups": "Active Groups",
+    "portfolio_breakdown": "Loan Portfolio",
+    "portfolio_title": "Portfolio by Product",
+    "portfolio_hint": "Click any card to open that loan module.",
+    "active_short": "active",
+    "total_loans": "Total Loans",
+    "outstanding_balance": "Outstanding Balance"
   },
   "loan": {
     "search_placeholder": "Search by member name or loan number",

@@ -2,6 +2,7 @@
 
 import {useEffect, useMemo, useState, useTransition} from 'react';
 import type {AdmissionBookRow, AdmissionGroup} from '@/lib/data';
+import {createClient} from '@/lib/supabase/client';
 
 type Props = {
   initialRows: AdmissionBookRow[];
@@ -39,18 +40,104 @@ export function AdmissionBookModule({initialRows, groups}: Props) {
       return;
     }
 
-    setLoadingGroup(true);
-    fetch(`/api/admission/members?groupId=${groupFilter}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setRows(Array.isArray(data?.rows) ? data.rows : []);
-      })
-      .catch(() => {
+    const supabase = createClient();
+    let cancelled = false;
+
+    const loadMembers = async () => {
+      setLoadingGroup(true);
+      setError('');
+      const groupResult = await supabase
+        .from('groups')
+        .select('id,group_name,group_number')
+        .eq('id', groupFilter)
+        .single();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (groupResult.error || !groupResult.data) {
         setRows([]);
-      })
-      .finally(() => {
         setLoadingGroup(false);
+        return;
+      }
+
+      const memberLinks = await supabase
+        .from('group_members')
+        .select('member_id,joined_at')
+        .eq('group_id', groupFilter)
+        .order('joined_at', {ascending: true});
+
+      if (cancelled) {
+        return;
+      }
+
+      if (memberLinks.error || !memberLinks.data || memberLinks.data.length === 0) {
+        setRows([]);
+        setLoadingGroup(false);
+        return;
+      }
+
+      const memberIds = memberLinks.data.map((row) => row.member_id);
+      const [membersResult, admissionResult] = await Promise.all([
+        supabase
+          .from('members')
+          .select('id,member_number,full_name,phone')
+          .in('id', memberIds),
+        supabase
+          .from('admission_books')
+          .select('member_id,has_book')
+          .in('member_id', memberIds)
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (membersResult.error || !membersResult.data) {
+        setRows([]);
+        setLoadingGroup(false);
+        return;
+      }
+
+      const memberMap = new Map(
+        membersResult.data.map((member) => [
+          member.id,
+          {
+            memberNumber: member.member_number,
+            fullName: member.full_name,
+            phone: member.phone ?? null
+          }
+        ])
+      );
+
+      const admissionMap = new Map(
+        (admissionResult.data ?? []).map((row) => [row.member_id, row.has_book])
+      );
+
+      const mapped = memberIds.map((memberId) => {
+        const member = memberMap.get(memberId);
+        return {
+          groupId: groupResult.data.id,
+          groupName: groupResult.data.group_name,
+          groupNumber: groupResult.data.group_number,
+          memberId,
+          memberNumber: member?.memberNumber ?? '-',
+          fullName: member?.fullName ?? '-',
+          phone: member?.phone ?? null,
+          hasBook: Boolean(admissionMap.get(memberId))
+        };
       });
+
+      setRows(mapped);
+      setLoadingGroup(false);
+    };
+
+    loadMembers();
+
+    return () => {
+      cancelled = true;
+    };
   }, [groupFilter, initialRows]);
 
   const toggleBook = (memberId: string, hasBook: boolean) => {
