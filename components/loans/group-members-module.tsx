@@ -1,36 +1,40 @@
-﻿'use client';
+'use client';
 
-import {useMemo, useState} from 'react';
+import {useState} from 'react';
 import {ArrowLeft, Plus, Trash2} from 'lucide-react';
-import {Link, useRouter} from '@/lib/navigation';
-import type {GroupDetail, GroupMemberDetail, MemberOption} from '@/lib/data';
+import {useRouter} from '@/lib/navigation';
+import type {GroupDetail, GroupMemberDetail} from '@/lib/data';
 import type {LoanRecord} from '@/types';
 import {LoanTable} from './loan-table';
+import {GroupLoanFormDialog} from './group-loan-form-dialog';
 
 type Props = {
   group: GroupDetail;
-  allMembers: MemberOption[];
   loans: LoanRecord[];
 };
 
-export function GroupMembersModule({group, allMembers, loans}: Props) {
+export function GroupMembersModule({group, loans}: Props) {
   const router = useRouter();
   const [members, setMembers] = useState<GroupMemberDetail[]>(group.members);
-  const [selectedMemberId, setSelectedMemberId] = useState('');
-  const [roleInGroup, setRoleInGroup] = useState('Member');
+  const [showNewRow, setShowNewRow] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberNumber, setNewMemberNumber] = useState('');
+  const [newMemberPhone, setNewMemberPhone] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('Member');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [view, setView] = useState<'members' | 'loans'>('members');
-
-  const availableMembers = useMemo(() => {
-    const assigned = new Set(members.map((member) => member.memberId));
-    return allMembers.filter((member) => !assigned.has(member.id));
-  }, [allMembers, members]);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editNumber, setEditNumber] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editRole, setEditRole] = useState('Member');
+  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedMemberId) {
-      setError('Choose a member first.');
+    if (!newMemberName) {
+      setError('Enter member name first.');
       return;
     }
 
@@ -40,34 +44,130 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
     const response = await fetch(`/api/groups/${group.id}/members`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({memberId: selectedMemberId, roleInGroup})
+      body: JSON.stringify({
+        memberNumber: newMemberNumber,
+        fullName: newMemberName,
+        phone: newMemberPhone,
+        roleInGroup: newMemberRole
+      })
     });
 
     const result = await response.json();
     if (!response.ok) {
-      setError(result.error ?? 'Failed to add member');
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message ??
+            (result.error ? JSON.stringify(result.error) : null);
+      setError(message ?? 'Failed to add member');
       setSubmitting(false);
       return;
     }
 
-    const selected = allMembers.find((member) => member.id === selectedMemberId);
-    if (selected) {
+    const created = result.member as {
+      id: string;
+      member_number: string;
+      full_name: string;
+      phone: string | null;
+    } | null;
+
+    if (created) {
       setMembers((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
-          memberId: selected.id,
-          memberNumber: selected.memberNumber,
-          fullName: selected.fullName,
-          phone: selected.phone,
-          roleInGroup
+          memberId: created.id,
+          memberNumber: created.member_number,
+          fullName: created.full_name,
+          phone: created.phone ?? null,
+          roleInGroup: newMemberRole
         }
       ]);
     }
 
-    setSelectedMemberId('');
-    setRoleInGroup('Member');
+    setNewMemberName('');
+    setNewMemberNumber('');
+    setNewMemberPhone('');
+    setNewMemberRole('Member');
     setSubmitting(false);
+    setShowNewRow(false);
+    router.refresh();
+  };
+
+  const startEdit = (member: GroupMemberDetail) => {
+    setEditingMemberId(member.memberId);
+    setEditName(member.fullName);
+    setEditNumber(member.memberNumber ?? '');
+    setEditPhone(member.phone ?? '');
+    setEditRole(member.roleInGroup ?? 'Member');
+  };
+
+  const cancelEdit = () => {
+    setEditingMemberId(null);
+    setEditName('');
+    setEditNumber('');
+    setEditPhone('');
+    setEditRole('Member');
+  };
+
+  const saveEdit = async (memberId: string) => {
+    if (!editName) {
+      setError('Member name is required.');
+      return;
+    }
+
+    setSavingMemberId(memberId);
+    setError('');
+
+    const response = await fetch(`/api/groups/${group.id}/members`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        memberId,
+        memberNumber: editNumber,
+        fullName: editName,
+        phone: editPhone,
+        roleInGroup: editRole
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      const message =
+        typeof result.error === 'string'
+          ? result.error
+          : result.error?.message ??
+            (result.error ? JSON.stringify(result.error) : null);
+      setError(message ?? 'Failed to update member');
+      setSavingMemberId(null);
+      return;
+    }
+
+    const updated = result.member as {
+      id: string;
+      member_number: string;
+      full_name: string;
+      phone: string | null;
+    } | null;
+
+    if (updated) {
+      setMembers((current) =>
+        current.map((member) =>
+          member.memberId === memberId
+            ? {
+                ...member,
+                memberNumber: updated.member_number,
+                fullName: updated.full_name,
+                phone: updated.phone ?? null,
+                roleInGroup: result.roleInGroup ?? editRole
+              }
+            : member
+        )
+      );
+    }
+
+    setSavingMemberId(null);
+    cancelEdit();
     router.refresh();
   };
 
@@ -88,9 +188,13 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <Link href="/mikopo-vikundi-wakinamama" className="mb-2 inline-flex items-center gap-2 text-sm text-muted-foreground hover:underline">
+          <button
+            type="button"
+            onClick={() => router.push('/mikopo-vikundi-wakinamama')}
+            className="mb-2 inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+          >
             <ArrowLeft size={14} /> Back to Groups
-          </Link>
+          </button>
           <h1 className="text-xl font-semibold">{group.groupName}</h1>
           <p className="text-sm text-muted-foreground">{group.groupNumber}</p>
         </div>
@@ -118,37 +222,18 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
 
       {view === 'members' ? (
         <>
-          <form onSubmit={addMember} className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-4">
-            <select
-              className="rounded-lg border bg-background px-3 py-2 text-sm md:col-span-2"
-              value={selectedMemberId}
-              onChange={(e) => setSelectedMemberId(e.target.value)}
-              required
-            >
-              <option value="">Select member</option>
-              {availableMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.memberNumber} - {member.fullName}
-                </option>
-              ))}
-            </select>
-            <input
-              className="rounded-lg border bg-background px-3 py-2 text-sm"
-              value={roleInGroup}
-              onChange={(e) => setRoleInGroup(e.target.value)}
-              placeholder="Role in group"
-            />
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              type="button"
+              onClick={() => setShowNewRow((value) => !value)}
+              className="inline-flex items-center gap-2"
             >
-              <Plus size={16} /> {submitting ? 'Adding...' : 'Add Member'}
+              <Plus size={16} /> {showNewRow ? 'Close Form' : 'Add New Member'}
             </button>
             {error ? (
-              <p className="md:col-span-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
             ) : null}
-          </form>
+          </div>
 
           <div className="overflow-x-auto rounded-xl border bg-card">
             <table className="w-full min-w-[1000px] text-sm">
@@ -163,20 +248,146 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
                 </tr>
               </thead>
               <tbody>
+                {showNewRow ? (
+                  <tr className="border-t bg-muted/40">
+                    <td className="px-3 py-2 text-sm text-muted-foreground">New</td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                        value={newMemberNumber}
+                        onChange={(e) => setNewMemberNumber(e.target.value)}
+                        placeholder="e.g. M-001"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                        value={newMemberName}
+                        onChange={(e) => setNewMemberName(e.target.value)}
+                        placeholder="Member name"
+                        required
+                      />
+                    </td>
+                    <td className="px-3 py-2 hidden md:table-cell">
+                      <input
+                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                        value={newMemberPhone}
+                        onChange={(e) => setNewMemberPhone(e.target.value)}
+                        placeholder="Phone"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                        value={newMemberRole}
+                        onChange={(e) => setNewMemberRole(e.target.value)}
+                        placeholder="Role"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <form onSubmit={addMember} className="flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                        >
+                          <Plus size={12} /> {submitting ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewRow(false)}
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ) : null}
                 {members.map((member, index) => (
                   <tr key={member.memberId} className="border-t">
                     <td className="px-3 py-2">{index + 1}</td>
-                    <td className="px-3 py-2">{member.memberNumber}</td>
-                    <td className="px-3 py-2">{member.fullName}</td>
-                    <td className="px-3 py-2 hidden md:table-cell">{member.phone ?? '-'}</td>
-                    <td className="px-3 py-2">{member.roleInGroup ?? 'Member'}</td>
                     <td className="px-3 py-2">
-                      <button
-                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                        onClick={() => void removeMember(member.memberId)}
-                      >
-                        <Trash2 size={12} /> Remove
-                      </button>
+                      {editingMemberId === member.memberId ? (
+                        <input
+                          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                          value={editNumber}
+                          onChange={(e) => setEditNumber(e.target.value)}
+                          placeholder={member.memberNumber}
+                        />
+                      ) : (
+                        member.memberNumber
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {editingMemberId === member.memberId ? (
+                        <input
+                          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                        />
+                      ) : (
+                        member.fullName
+                      )}
+                    </td>
+                    <td className="px-3 py-2 hidden md:table-cell">
+                      {editingMemberId === member.memberId ? (
+                        <input
+                          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                        />
+                      ) : (
+                        member.phone ?? '-'
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {editingMemberId === member.memberId ? (
+                        <input
+                          className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+                          value={editRole}
+                          onChange={(e) => setEditRole(e.target.value)}
+                        />
+                      ) : (
+                        member.roleInGroup ?? 'Member'
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {editingMemberId === member.memberId ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={savingMemberId === member.memberId}
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                            onClick={() => void saveEdit(member.memberId)}
+                          >
+                            {savingMemberId === member.memberId ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                            onClick={cancelEdit}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                            onClick={() => startEdit(member)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                            onClick={() => void removeMember(member.memberId)}
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -192,7 +403,10 @@ export function GroupMembersModule({group, allMembers, loans}: Props) {
           </div>
         </>
       ) : (
-        <LoanTable loanType="vikundi_wakinamama" rows={loans} count={loans.length} />
+        <>
+          <GroupLoanFormDialog groupId={group.id} members={group.members} />
+          <LoanTable loanType="vikundi_wakinamama" rows={loans} count={loans.length} />
+        </>
       )}
     </section>
   );

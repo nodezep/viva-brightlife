@@ -1,15 +1,14 @@
-﻿import {notFound} from 'next/navigation';
+import {notFound} from 'next/navigation';
 import {GroupMembersModule} from '@/components/loans/group-members-module';
-import {getGroupDetail, getMembersForGroupSelection, getLoansByGroup} from '@/lib/data';
+import {getGroupDetail, getLoansByGroup} from '@/lib/data';
 
 export default async function GroupDetailsPage({
   params
 }: {
   params: {groupId: string};
 }) {
-  const [group, members, loans] = await Promise.all([
+  const [group, loans] = await Promise.all([
     getGroupDetail(params.groupId),
-    getMembersForGroupSelection(),
     getLoansByGroup(params.groupId)
   ]);
 
@@ -17,5 +16,5 @@ export default async function GroupDetailsPage({
     notFound();
   }
 
-  return <GroupMembersModule group={group} allMembers={members} loans={loans} />;
+  return <GroupMembersModule group={group} loans={loans} />;
 }

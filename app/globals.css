@@ -38,6 +38,22 @@ body {
   @apply bg-background text-foreground antialiased;
 }
 
+@layer base {
+  button {
+    @apply inline-flex items-center justify-center rounded-lg border border-primary/20 bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  button.text-red-700,
+  button.text-red-600,
+  button.text-red-800 {
+    @apply border-red-200 bg-red-50 hover:bg-red-100;
+  }
+
+  button.text-muted-foreground {
+    @apply border-muted bg-muted/80 text-foreground hover:bg-muted;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;

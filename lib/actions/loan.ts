@@ -6,18 +6,41 @@ import {revalidatePath} from 'next/cache';
 export async function createLoanAction(formData: FormData) {
   const supabase = createClient();
   
+  const memberIdFromForm = formData.get('memberId') as string | null;
+  const groupId = formData.get('groupId') as string | null;
   const memberNumber = formData.get('memberNumber') as string;
   const memberName = formData.get('memberName') as string;
   const loanNumber = formData.get('loanNumber') as string;
   const loanType = formData.get('loanType') as string;
   const principalAmount = Number(formData.get('disbursementAmount'));
   const disbursementDate = formData.get('disbursementDate') as string;
-  const securityAmount = Number(formData.get('securityAmount') || 0);
+  let securityAmount = Number(formData.get('securityAmount') || 0);
+  const interestRate = Number(formData.get('interestRate') || 0);
   const cycleCount = Number(formData.get('cycle') || 1);
-  const installmentSize = Number(formData.get('installmentSize') || 0);
-  const outstandingBalance = Number(formData.get('outstandingBalance') || 0);
+  let installmentSize = Number(formData.get('installmentSize') || 0);
+  let outstandingBalance = Number(formData.get('outstandingBalance') || 0);
   const overdueAmount = Number(formData.get('overdueAmount') || 0);
-  const durationWeeks = Number(formData.get('durationWeeks') || 1);
+  const amountPaid = Number(formData.get('amountPaid') || 0);
+  const memberPhone = formData.get('memberPhone') as string | null;
+  const daysOverdue = Number(formData.get('daysOverdue') || 0);
+  const durationWeeksRaw = formData.get('durationWeeks');
+  const durationWeeks =
+    durationWeeksRaw === null || durationWeeksRaw === ''
+      ? 1
+      : Number(durationWeeksRaw);
+  const durationMonths = Number(formData.get('durationMonths') || 0);
+
+  let interestRatePercent = interestRate;
+  if (loanType === 'binafsi') {
+    const normalizedInterest =
+      interestRate <= 1
+        ? {percent: interestRate * 100, decimal: interestRate}
+        : {percent: interestRate, decimal: interestRate / 100};
+    interestRatePercent = normalizedInterest.percent;
+    securityAmount = principalAmount * normalizedInterest.decimal;
+    installmentSize = principalAmount + securityAmount;
+    outstandingBalance = Math.max(installmentSize - amountPaid, 0);
+  }
   
   // Custom desc build
   let itemDescription = '';
@@ -42,34 +65,47 @@ export async function createLoanAction(formData: FormData) {
     ].filter(Boolean).join(' | ');
   }
 
-  // Find or create member matching memberNumber
+  // Find or create member matching memberNumber (or use provided memberId)
   let memberId = '';
-  const {data: existingMember} = await supabase
-    .from('members')
-    .select('id')
-    .eq('member_number', memberNumber)
-    .single();
-
-  if (existingMember) {
-    memberId = existingMember.id;
+  if (memberIdFromForm) {
+    memberId = memberIdFromForm;
   } else {
-    const {data: newMember, error: memberError} = await supabase
+    const {data: existingMember} = await supabase
       .from('members')
-      .insert({
-        member_number: memberNumber,
-        full_name: memberName
-      })
       .select('id')
+      .eq('member_number', memberNumber)
       .single();
-      
-    if (memberError || !newMember) {
-      return { error: 'Failed to create member: ' + memberError.message };
+
+    if (existingMember) {
+      memberId = existingMember.id;
+      const updatePayload: Record<string, unknown> = {
+        full_name: memberName
+      };
+      if (memberPhone?.trim()) {
+        updatePayload.phone = memberPhone.trim();
+      }
+      await supabase.from('members').update(updatePayload).eq('id', memberId);
+    } else {
+      const {data: newMember, error: memberError} = await supabase
+        .from('members')
+        .insert({
+          member_number: memberNumber,
+          full_name: memberName,
+          phone: memberPhone?.trim() ? memberPhone.trim() : null
+        })
+        .select('id')
+        .single();
+        
+      if (memberError || !newMember) {
+        return { error: 'Failed to create member: ' + memberError.message };
+      }
+      memberId = newMember.id;
     }
-    memberId = newMember.id;
   }
 
-  const {data, error} = await supabase.from('loans').insert({
+  const insertPayload: Record<string, unknown> = {
     member_id: memberId,
+    group_id: groupId || null,
     loan_number: loanNumber,
     loan_type: loanType,
     principal_amount: principalAmount,
@@ -83,7 +119,16 @@ export async function createLoanAction(formData: FormData) {
     overdue_amount: overdueAmount,
     status: 'active',
     item_description: itemDescription || null
-  }).select('id').single();
+  };
+
+  if (loanType === 'binafsi') {
+    insertPayload.duration_months = durationMonths;
+    insertPayload.amount_withdrawn = amountPaid;
+    insertPayload.interest_rate = interestRatePercent;
+    insertPayload.days_overdue = daysOverdue;
+  }
+
+  const {data, error} = await supabase.from('loans').insert(insertPayload).select('id').single();
 
   if (error || !data) {
     return { error: error?.message || 'Failed to create loan' };
@@ -92,7 +137,7 @@ export async function createLoanAction(formData: FormData) {
   const loanId = data.id;
 
   // Create weekly schedule (Marejesho) automatically
-  if (durationWeeks > 0) {
+  if (loanType !== 'binafsi' && durationWeeks > 0) {
     const schedules = [];
     let remainingAmount = outstandingBalance;
     let currentDate = new Date(disbursementDate);
@@ -164,16 +209,25 @@ export async function updateLoanAction(formData: FormData) {
   const loanNumber = formData.get('loanNumber') as string;
   const principalAmount = Number(formData.get('disbursementAmount'));
   const disbursementDate = formData.get('disbursementDate') as string;
-  const securityAmount = Number(formData.get('securityAmount') || 0);
+  let securityAmount = Number(formData.get('securityAmount') || 0);
+  const interestRate = Number(formData.get('interestRate') || 0);
   const cycleCount = Number(formData.get('cycle') || 1);
-  const installmentSize = Number(formData.get('installmentSize') || 0);
-  const outstandingBalance = Number(formData.get('outstandingBalance') || 0);
+  let installmentSize = Number(formData.get('installmentSize') || 0);
+  let outstandingBalance = Number(formData.get('outstandingBalance') || 0);
   const overdueAmount = Number(formData.get('overdueAmount') || 0);
-  const durationWeeks = Number(formData.get('durationWeeks') || 0);
+  const amountPaid = Number(formData.get('amountPaid') || 0);
+  const memberPhone = formData.get('memberPhone') as string | null;
+  const daysOverdue = Number(formData.get('daysOverdue') || 0);
+  const durationWeeksRaw = formData.get('durationWeeks');
+  const durationWeeks =
+    durationWeeksRaw === null || durationWeeksRaw === ''
+      ? 0
+      : Number(durationWeeksRaw);
+  const durationMonths = Number(formData.get('durationMonths') || 0);
 
   const {data: loanRow, error: loanError} = await supabase
     .from('loans')
-    .select('member_id')
+    .select('member_id, loan_type')
     .eq('id', loanId)
     .single();
 
@@ -182,16 +236,38 @@ export async function updateLoanAction(formData: FormData) {
   }
 
   const memberId = loanRow.member_id as string;
+  const loanType = loanRow.loan_type as string;
+
+  let interestRatePercent = interestRate;
+  if (loanType === 'binafsi') {
+    const normalizedInterest =
+      interestRate <= 1
+        ? {percent: interestRate * 100, decimal: interestRate}
+        : {percent: interestRate, decimal: interestRate / 100};
+    interestRatePercent = normalizedInterest.percent;
+    securityAmount = principalAmount * normalizedInterest.decimal;
+    installmentSize = principalAmount + securityAmount;
+    outstandingBalance = Math.max(installmentSize - amountPaid, 0);
+  }
+  const memberPayload: Record<string, unknown> = {
+    member_number: memberNumber,
+    full_name: memberName
+  };
+
+  if (memberPhone?.trim()) {
+    memberPayload.phone = memberPhone.trim();
+  }
+
   const {error: memberError} = await supabase
     .from('members')
-    .update({member_number: memberNumber, full_name: memberName})
+    .update(memberPayload)
     .eq('id', memberId);
 
   if (memberError) {
     return {error: memberError.message};
   }
 
-  const {error: updateError} = await supabase.from('loans').update({
+  const updatePayload: Record<string, unknown> = {
     loan_number: loanNumber,
     principal_amount: principalAmount,
     disbursement_date: disbursementDate,
@@ -200,13 +276,22 @@ export async function updateLoanAction(formData: FormData) {
     weekly_installment: installmentSize,
     outstanding_balance: outstandingBalance,
     overdue_amount: overdueAmount
-  }).eq('id', loanId);
+  };
+
+  if (loanType === 'binafsi') {
+    updatePayload.duration_months = durationMonths;
+    updatePayload.amount_withdrawn = amountPaid;
+    updatePayload.interest_rate = interestRatePercent;
+    updatePayload.days_overdue = daysOverdue;
+  }
+
+  const {error: updateError} = await supabase.from('loans').update(updatePayload).eq('id', loanId);
 
   if (updateError) {
     return {error: updateError.message};
   }
 
-  if (durationWeeks > 0) {
+  if (loanType !== 'binafsi' && durationWeeks > 0) {
     const {error: deleteError} = await supabase
       .from('loan_schedules')
       .delete()

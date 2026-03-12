@@ -6,6 +6,7 @@ import {LoanTable} from './loan-table';
 import {LoanFormDialog} from './loan-form-dialog';
 import {PaginationControls} from './pagination-controls';
 import {PrintButton} from './print-button';
+import {LoanExportButton} from './loan-export-button';
 
 type Props = {
   loanType: LoanType;
@@ -22,19 +23,23 @@ export async function LoanModule({loanType, title, query, startDate, endDate, pa
 
   return (
     <section className="space-y-4 relative w-full">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-start gap-3">
         <div>
           <h1 className="text-xl font-semibold">{title}</h1>
           <p className="text-sm text-muted-foreground">Live Supabase records</p>
         </div>
         
+        <div className="min-w-[280px] flex-1 max-w-4xl">
+          <LoanFilters />
+        </div>
+
         <div className="no-print flex gap-2">
           <PrintButton />
-          <LoanFormDialog loanType={loanType} />
+          <LoanExportButton loanType={loanType} />
         </div>
       </div>
-      
-      <LoanFilters />
+
+      <LoanFormDialog loanType={loanType} />
       
       <LoanTable loanType={loanType} rows={rows} count={count} />
       

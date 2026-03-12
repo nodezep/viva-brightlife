@@ -14,10 +14,36 @@ export function LoanEditForm({loan, onClose}: Props) {
   const t = useTranslations();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const isIndividual = loan.loanType === 'binafsi';
 
   const [totalRepay, setTotalRepay] = useState(String(loan.outstandingBalance ?? ''));
   const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState(String(loan.installmentSize ?? ''));
+
+  const [principal, setPrincipal] = useState(String(loan.disbursementAmount ?? ''));
+  const [disbursementDate, setDisbursementDate] = useState(loan.disbursementDate ?? '');
+  const [durationMonths, setDurationMonths] = useState(
+    loan.durationMonths ? String(loan.durationMonths) : ''
+  );
+  const [memberSerial, setMemberSerial] = useState(loan.memberNumber ?? '');
+  const [interestRate, setInterestRate] = useState(() => {
+    if (loan.interestRate && loan.interestRate > 0) {
+      return Number(loan.interestRate).toFixed(2);
+    }
+    const principalValue = Number(loan.disbursementAmount) || 0;
+    const interestAmount = Number(loan.securityAmount) || 0;
+    if (principalValue <= 0 || interestAmount <= 0) {
+      return '';
+    }
+    return ((interestAmount / principalValue) * 100).toFixed(2);
+  });
+  const [amountPaid, setAmountPaid] = useState(
+    loan.amountPaid ? String(loan.amountPaid) : ''
+  );
+  const [memberPhone, setMemberPhone] = useState(loan.memberPhone ?? '');
+  const [daysOverdue, setDaysOverdue] = useState(
+    loan.daysOverdue ? String(loan.daysOverdue) : ''
+  );
 
   useEffect(() => {
     const repayVal = Number(totalRepay);
@@ -28,6 +54,9 @@ export function LoanEditForm({loan, onClose}: Props) {
       setInstallment(suggested.toString());
     }
   }, [totalRepay, durationWeeks]);
+
+  const durationMonthsValue = Number(durationMonths) || 0;
+  const loanNumber = loan.loanNumber || (memberSerial ? `BIN-${memberSerial}` : '');
 
   const handleSubmit = (formData: FormData) => {
     setError(null);
@@ -47,6 +76,94 @@ export function LoanEditForm({loan, onClose}: Props) {
       action={handleSubmit}
     >
       <input type="hidden" name="loanId" value={loan.id} />
+      {isIndividual ? (
+        <>
+          <input
+            required
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="S/NO"
+            name="memberNumber"
+            value={memberSerial}
+            onChange={(e) => setMemberSerial(e.target.value)}
+          />
+          <input
+            required
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Jina"
+            name="memberName"
+            defaultValue={loan.memberName}
+          />
+          <input
+            required
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Kiasi cha Mkopo"
+            name="disbursementAmount"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+          />
+          <input
+            required
+            type="date"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            name="disbursementDate"
+            value={disbursementDate}
+            onChange={(e) => setDisbursementDate(e.target.value)}
+          />
+          <input
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Idadi ya Siku za Malimbikizo"
+            name="daysOverdue"
+            value={daysOverdue}
+            onChange={(e) => setDaysOverdue(e.target.value)}
+            min={0}
+          />
+          <input
+            required
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Asilimia ya Riba"
+            name="interestRate"
+            value={interestRate}
+            onChange={(e) => setInterestRate(e.target.value)}
+            min={0}
+            step="0.01"
+          />
+          <input
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Muda wa Mkopo (Mwezi)"
+            name="durationMonths"
+            value={durationMonths}
+            onChange={(e) => setDurationMonths(e.target.value)}
+            min={1}
+          />
+          <input
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Malipo ya Mkopo"
+            name="amountPaid"
+            value={amountPaid}
+            onChange={(e) => setAmountPaid(e.target.value)}
+            min={0}
+          />
+          <input
+            type="tel"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Namba ya Simu"
+            name="memberPhone"
+            value={memberPhone}
+            onChange={(e) => setMemberPhone(e.target.value)}
+          />
+
+          <input type="hidden" name="cycle" value={durationMonthsValue || 1} />
+          <input type="hidden" name="durationWeeks" value={0} />
+          <input type="hidden" name="overdueAmount" value={0} />
+          <input type="hidden" name="loanNumber" value={loanNumber} />
+        </>
+      ) : (
+        <>
       <input
         required
         className="rounded-lg border bg-background px-3 py-2 text-sm"
@@ -131,6 +248,8 @@ export function LoanEditForm({loan, onClose}: Props) {
         name="overdueAmount"
         defaultValue={loan.overdueAmount}
       />
+        </>
+      )}
 
       {error ? (
         <p className="md:col-span-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">

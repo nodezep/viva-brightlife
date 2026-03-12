@@ -15,7 +15,7 @@ export function LoanFormDialog({loanType}: Props) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="no-print">
+    <div className="no-print w-full">
       <div className="flex justify-end mb-2">
         <button
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
@@ -26,8 +26,10 @@ export function LoanFormDialog({loanType}: Props) {
       </div>
       
       {open ? (
-        <div className="mb-4">
-           <LoanForm loanType={loanType} onClose={() => setOpen(false)} />
+        <div className="mb-4 w-full">
+          <div className="mx-auto w-full max-w-5xl">
+            <LoanForm loanType={loanType} onClose={() => setOpen(false)} />
+          </div>
         </div>
       ) : null}
     </div>

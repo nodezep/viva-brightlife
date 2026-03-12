@@ -4,7 +4,7 @@ import {createClient} from '@/lib/supabase/server';
 
 const createGroupSchema = z.object({
   groupName: z.string().min(2),
-  groupNumber: z.string().min(2),
+  groupNumber: z.string().min(1),
   groupType: z.string().min(2).optional()
 });
 

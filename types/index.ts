@@ -24,6 +24,11 @@ export type LoanRecord = {
   overdueAmount: number;
   status: LoanStatus;
   loanType: LoanType;
+  durationMonths?: number;
+  amountPaid?: number;
+  memberPhone?: string | null;
+  interestRate?: number;
+  daysOverdue?: number;
 };
 
 export type NavItem = {

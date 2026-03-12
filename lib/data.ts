@@ -12,10 +12,14 @@ type LoanRow = {
   weekly_installment: number;
   outstanding_balance: number;
   overdue_amount: number;
+  duration_months?: number | null;
+  amount_withdrawn?: number | null;
+  interest_rate?: number | null;
+  days_overdue?: number | null;
   status: 'active' | 'closed' | 'defaulted' | 'pending';
   members:
-    | {member_number: string; full_name: string}
-    | {member_number: string; full_name: string}[]
+    | {member_number: string; full_name: string; phone: string | null}
+    | {member_number: string; full_name: string; phone: string | null}[]
     | null;
 };
 
@@ -33,6 +37,7 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     id: row.id,
     memberNumber: member?.member_number ?? '-',
     memberName: member?.full_name ?? '-',
+    memberPhone: member?.phone ?? null,
     cycle: row.cycle_count,
     securityAmount: Number(row.security_amount ?? 0),
     loanNumber: row.loan_number,
@@ -42,7 +47,11 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     outstandingBalance: Number(row.outstanding_balance ?? 0),
     overdueAmount: Number(row.overdue_amount ?? 0),
     status: row.status,
-    loanType: row.loan_type
+    loanType: row.loan_type,
+    durationMonths: Number(row.duration_months ?? 0) || 0,
+    amountPaid: Number(row.amount_withdrawn ?? 0),
+    interestRate: Number(row.interest_rate ?? 0),
+    daysOverdue: Number(row.days_overdue ?? 0)
   };
 }
 
@@ -59,7 +68,7 @@ export async function getLoansByType(
   let dbQuery = supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,status,members!inner(member_number,full_name)',
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(member_number,full_name,phone)',
       { count: 'exact' }
     )
     .eq('loan_type', loanType);
@@ -103,7 +112,7 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   const {data, error} = await supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,status,members(member_number,full_name)'
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
     )
     .order('created_at', {ascending: false});
 
@@ -413,7 +422,7 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   const {data, error} = await supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,status,members(member_number,full_name)'
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
     )
     .eq('group_id', groupId)
     .order('created_at', {ascending: false});

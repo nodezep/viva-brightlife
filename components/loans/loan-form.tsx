@@ -14,11 +14,22 @@ export function LoanForm({loanType, onClose}: Props) {
   const t = useTranslations();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const isIndividual = loanType === 'binafsi';
 
   // States for automatic calculation
   const [totalRepay, setTotalRepay] = useState('');
   const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState('');
+
+  // Individual loan (binafsi) states
+  const [principal, setPrincipal] = useState('');
+  const [disbursementDate, setDisbursementDate] = useState('');
+  const [durationMonths, setDurationMonths] = useState('');
+  const [interestRate, setInterestRate] = useState('');
+  const [amountPaid, setAmountPaid] = useState('');
+  const [daysOverdue, setDaysOverdue] = useState('');
+  const [memberSerial, setMemberSerial] = useState('');
+  const [memberPhone, setMemberPhone] = useState('');
 
   // Auto-calculate installment size based on Total Repay and Weeks
   useEffect(() => {
@@ -48,11 +59,101 @@ export function LoanForm({loanType, onClose}: Props) {
     });
   };
 
+  const durationMonthsValue = Number(durationMonths) || 0;
+  const loanNumber = memberSerial ? `BIN-${memberSerial}` : '';
+
   return (
     <form
       className="no-print grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-3"
       action={handleSubmit}
     >
+      {isIndividual ? (
+        <>
+          <input
+            required
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="S/NO"
+            name="memberNumber"
+            value={memberSerial}
+            onChange={(e) => setMemberSerial(e.target.value)}
+          />
+          <input
+            required
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Jina"
+            name="memberName"
+          />
+          <input
+            required
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Kiasi cha Mkopo"
+            name="disbursementAmount"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+          />
+          <input
+            required
+            type="date"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            name="disbursementDate"
+            value={disbursementDate}
+            onChange={(e) => setDisbursementDate(e.target.value)}
+          />
+          <input
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Idadi ya Siku za Malimbikizo"
+            name="daysOverdue"
+            value={daysOverdue}
+            onChange={(e) => setDaysOverdue(e.target.value)}
+            min={0}
+          />
+          <input
+            required
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Asilimia ya Riba"
+            name="interestRate"
+            value={interestRate}
+            onChange={(e) => setInterestRate(e.target.value)}
+            min={0}
+            step="0.01"
+          />
+          <input
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Muda wa Mkopo (Mwezi)"
+            name="durationMonths"
+            value={durationMonths}
+            onChange={(e) => setDurationMonths(e.target.value)}
+            min={1}
+          />
+          <input
+            type="number"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Malipo ya Mkopo"
+            name="amountPaid"
+            value={amountPaid}
+            onChange={(e) => setAmountPaid(e.target.value)}
+            min={0}
+          />
+          <input
+            type="tel"
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Namba ya Simu"
+            name="memberPhone"
+            value={memberPhone}
+            onChange={(e) => setMemberPhone(e.target.value)}
+          />
+
+          <input type="hidden" name="cycle" value={durationMonthsValue || 1} />
+          <input type="hidden" name="durationWeeks" value={0} />
+          <input type="hidden" name="overdueAmount" value={0} />
+          <input type="hidden" name="loanNumber" value={loanNumber} />
+        </>
+      ) : (
+        <>
       <input
         required
         className="rounded-lg border bg-background px-3 py-2 text-sm"
@@ -133,6 +234,8 @@ export function LoanForm({loanType, onClose}: Props) {
         placeholder={t('table.overdue_od') || 'Overdue OD'}
         name="overdueAmount"
       />
+        </>
+      )}
 
       {loanType === 'electronics' ? (
         <>

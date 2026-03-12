@@ -4,6 +4,7 @@ import {useState} from 'react';
 import {Plus, Trash2} from 'lucide-react';
 import {Link} from '@/lib/navigation';
 import type {GroupSummary} from '@/lib/data';
+import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 
 type Props = {
   initialGroups: GroupSummary[];
@@ -17,6 +18,7 @@ export function GroupsListModule({initialGroups}: Props) {
   const [deleteError, setDeleteError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GroupSummary | null>(null);
 
   const createGroup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,14 +69,7 @@ export function GroupsListModule({initialGroups}: Props) {
     setSubmitting(false);
   };
 
-  const deleteGroup = async (groupId: string, groupNameLabel: string) => {
-    const confirmed = window.confirm(
-      `Delete "${groupNameLabel}"? This will remove the group and all its members from it.`
-    );
-    if (!confirmed) {
-      return;
-    }
-
+  const deleteGroup = async (groupId: string) => {
     setDeletingGroupId(groupId);
     setDeleteError('');
 
@@ -162,7 +157,7 @@ export function GroupsListModule({initialGroups}: Props) {
                     <button
                       type="button"
                       disabled={deletingGroupId === group.id}
-                      onClick={() => void deleteGroup(group.id, group.groupName)}
+                      onClick={() => setDeleteTarget(group)}
                       className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-red-700 disabled:opacity-60"
                     >
                       <Trash2 size={12} />
@@ -182,6 +177,27 @@ export function GroupsListModule({initialGroups}: Props) {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete Group"
+        description={
+          deleteTarget
+            ? `Delete "${deleteTarget.groupName}"? This will remove the group and all its members from it.`
+            : ''
+        }
+        confirmLabel={deletingGroupId ? 'Deleting...' : 'Delete'}
+        cancelLabel="Cancel"
+        destructive
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) {
+            return;
+          }
+          void deleteGroup(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
     </section>
   );
 }
