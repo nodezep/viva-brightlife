@@ -11,9 +11,32 @@ export async function POST() {
     return NextResponse.json({error: 'Unauthorized'}, {status: 401});
   }
 
-  await supabase
+  const {data: existing} = await supabase
     .from('profiles')
-    .upsert({id: user.id, email: user.email, role: 'admin'}, {onConflict: 'id'});
+    .select('role,is_active')
+    .eq('id', user.id)
+    .maybeSingle();
 
-  return NextResponse.json({ok: true});
+  if (!existing) {
+    await supabase
+      .from('profiles')
+      .insert({id: user.id, email: user.email, role: 'viewer', is_active: true});
+  } else {
+    await supabase
+      .from('profiles')
+      .update({email: user.email})
+      .eq('id', user.id);
+  }
+
+  if (existing && existing.is_active === false) {
+    return NextResponse.json({error: 'Account disabled'}, {status: 403});
+  }
+
+  return NextResponse.json({
+    ok: true,
+    profile: {
+      role: existing?.role ?? 'viewer',
+      is_active: existing?.is_active ?? true
+    }
+  });
 }

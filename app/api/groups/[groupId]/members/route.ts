@@ -27,11 +27,9 @@ export async function POST(
   {params}: {params: {groupId: string}}
 ) {
   const supabase = createClient();
-  const {
-    data: {user}
-  } = await supabase.auth.getUser();
+  const {data: {user}, error: authError} = await supabase.auth.getUser();
 
-  if (!user) {
+  if (authError || !user) {
     return NextResponse.json({error: 'Unauthorized'}, {status: 401});
   }
 
@@ -127,11 +125,9 @@ export async function PUT(
   {params}: {params: {groupId: string}}
 ) {
   const supabase = createClient();
-  const {
-    data: {user}
-  } = await supabase.auth.getUser();
+  const {data: {user}, error: authError} = await supabase.auth.getUser();
 
-  if (!user) {
+  if (authError || !user) {
     return NextResponse.json({error: 'Unauthorized'}, {status: 401});
   }
 
@@ -186,11 +182,9 @@ export async function DELETE(
   {params}: {params: {groupId: string}}
 ) {
   const supabase = createClient();
-  const {
-    data: {user}
-  } = await supabase.auth.getUser();
+  const {data: {user}, error: authError} = await supabase.auth.getUser();
 
-  if (!user) {
+  if (authError || !user) {
     return NextResponse.json({error: 'Unauthorized'}, {status: 401});
   }
 

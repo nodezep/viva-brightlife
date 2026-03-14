@@ -29,7 +29,13 @@ export function LoginForm() {
     }
 
     if (data.user) {
-      await fetch('/api/profile/bootstrap', {method: 'POST'});
+      const bootstrap = await fetch('/api/profile/bootstrap', {method: 'POST'});
+      if (!bootstrap.ok) {
+        await supabase.auth.signOut();
+        setError('Your account has been disabled. Please contact the admin.');
+        setLoading(false);
+        return;
+      }
       router.replace('/dashboard');
       router.refresh();
       return;

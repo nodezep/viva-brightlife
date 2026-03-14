@@ -8,6 +8,7 @@ import {useRouter} from '@/lib/navigation';
 
 type Props = {
   loanId: string;
+  loanType?: string;
   onClose: () => void;
 };
 
@@ -20,9 +21,11 @@ type Schedule = {
   status: string;
 };
 
-export function LoanSchedulesDialog({loanId, onClose}: Props) {
+export function LoanSchedulesDialog({loanId, loanType, onClose}: Props) {
   const t = useTranslations();
   const router = useRouter();
+  const isMonthly = loanType === 'binafsi';
+  const periodLabel = isMonthly ? 'Mwezi' : 'Week';
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -86,7 +89,7 @@ export function LoanSchedulesDialog({loanId, onClose}: Props) {
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-muted/90 backdrop-blur-sm">
               <tr>
-                <th className="px-4 py-3 font-semibold">Week</th>
+                <th className="px-4 py-3 font-semibold">{periodLabel}</th>
                 <th className="px-4 py-3 font-semibold">Expected Date</th>
                 <th className="px-4 py-3 font-semibold">Expected Amount</th>
                 <th className="px-4 py-3 font-semibold">Paid Amount</th>

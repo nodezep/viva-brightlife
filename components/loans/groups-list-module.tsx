@@ -5,6 +5,7 @@ import {Plus, Trash2} from 'lucide-react';
 import {Link} from '@/lib/navigation';
 import type {GroupSummary} from '@/lib/data';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
+import {useProfile} from '@/lib/hooks/use-profile';
 
 type Props = {
   initialGroups: GroupSummary[];
@@ -19,6 +20,8 @@ export function GroupsListModule({initialGroups}: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GroupSummary | null>(null);
+  const {profile} = useProfile();
+  const [permissionError, setPermissionError] = useState('');
 
   const createGroup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -70,6 +73,12 @@ export function GroupsListModule({initialGroups}: Props) {
   };
 
   const deleteGroup = async (groupId: string) => {
+    if (profile?.role && profile.role !== 'admin') {
+      setPermissionError(
+        'Delete is restricted to admins. Please contact the admin for this action.'
+      );
+      return;
+    }
     setDeletingGroupId(groupId);
     setDeleteError('');
 
@@ -125,6 +134,11 @@ export function GroupsListModule({initialGroups}: Props) {
       {deleteError ? (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>
       ) : null}
+      {permissionError ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {permissionError}
+        </p>
+      ) : null}
 
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full min-w-[900px] text-sm">
@@ -156,9 +170,9 @@ export function GroupsListModule({initialGroups}: Props) {
                     </Link>
                     <button
                       type="button"
-                      disabled={deletingGroupId === group.id}
+                      disabled={deletingGroupId === group.id || (profile?.role && profile.role !== 'admin')}
                       onClick={() => setDeleteTarget(group)}
-                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-red-700 disabled:opacity-60"
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Trash2 size={12} />
                       {deletingGroupId === group.id ? 'Deleting...' : 'Delete'}

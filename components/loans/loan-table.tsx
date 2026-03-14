@@ -8,6 +8,7 @@ import {deleteLoanAction} from '@/lib/actions/loan';
 import {LoanSchedulesDialog} from './loan-schedules-dialog';
 import {LoanEditForm} from './loan-edit-form';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
+import {useProfile} from '@/lib/hooks/use-profile';
 
 type Props = {
   loanType: LoanType;
@@ -29,6 +30,8 @@ export function LoanTable({loanType, rows, count}: Props) {
   const isIndividual = loanType === 'binafsi';
   const [deleteTarget, setDeleteTarget] = useState<LoanRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const {profile} = useProfile();
+  const [permissionError, setPermissionError] = useState('');
 
   const addMonthsToIso = (isoDate: string, months: number) => {
     const base = new Date(isoDate);
@@ -157,6 +160,12 @@ export function LoanTable({loanType, rows, count}: Props) {
   }, [exportCsv, loanType]);
 
   const handleDelete = (target: LoanRecord) => {
+    if (profile?.role && profile.role !== 'admin') {
+      setPermissionError(
+        'Delete is restricted to admins. Please contact the admin for this action.'
+      );
+      return;
+    }
     setDeleteTarget(target);
   };
 
@@ -167,6 +176,11 @@ export function LoanTable({loanType, rows, count}: Props) {
           Showing {rows.length} of {count}
         </span>
       </div>
+      {permissionError ? (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {permissionError}
+        </div>
+      ) : null}
       <div className="overflow-x-auto rounded-xl border bg-card relative">
         {isIndividual ? (
           <table className="min-w-[1600px] w-full text-sm">
@@ -185,12 +199,15 @@ export function LoanTable({loanType, rows, count}: Props) {
                 <th className="px-3 py-2">{t('table.total_repay')}</th>
                 <th className="px-3 py-2">{t('table.balance')}</th>
                 <th className="px-3 py-2">{t('table.phone_number')}</th>
+                <th className="px-3 py-2">MAREJESHO</th>
                 <th className="px-3 py-2 no-print">{t('table.actions')}</th>
               </tr>
             </thead>
             <tbody className={isPending ? 'opacity-50' : ''}>
               {rows.map((row, index) => {
                 const returnDate = addMonthsToIso(row.disbursementDate, row.cycle);
+                const isOverdue =
+                  (row.daysOverdue ?? 0) > 0 || (row.overdueAmount ?? 0) > 0;
                 const ratePercent =
                   row.interestRate && row.interestRate > 0
                     ? row.interestRate
@@ -201,9 +218,24 @@ export function LoanTable({loanType, rows, count}: Props) {
                   ratePercent <= 1 ? ratePercent : ratePercent / 100;
                 return (
                   <Fragment key={row.id}>
-                    <tr className="border-t">
+                    <tr
+                      className={`border-t ${
+                        isOverdue
+                          ? 'bg-red-50/70 hover:bg-red-50 dark:bg-red-950/35 dark:hover:bg-red-950/55'
+                          : ''
+                      }`}
+                    >
                       <td className="px-3 py-2">{index + 1}</td>
-                      <td className="px-3 py-2">{row.memberName}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span>{row.memberName}</span>
+                          {isOverdue ? (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700 dark:bg-red-900/60 dark:text-red-200">
+                              Overdue
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
                       <td className="px-3 py-2">{row.disbursementDate}</td>
                       <td className="px-3 py-2">{returnDate}</td>
@@ -215,6 +247,14 @@ export function LoanTable({loanType, rows, count}: Props) {
                       <td className="px-3 py-2">{currency.format(row.installmentSize)}</td>
                       <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
                       <td className="px-3 py-2">{row.memberPhone ?? '-'}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                          onClick={() => setSelectedLoanId(row.id)}
+                        >
+                          <CalendarDays size={12} /> Marejesho
+                        </button>
+                      </td>
                       <td className="px-3 py-2 no-print">
                         <div className="flex gap-1">
                           <button
@@ -226,8 +266,9 @@ export function LoanTable({loanType, rows, count}: Props) {
                             {t('buttons.edit')}
                           </button>
                           <button
-                            className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50"
+                            className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => handleDelete(row)}
+                            disabled={profile?.role && profile.role !== 'admin'}
                           >
                             <Trash2 size={12} /> {t('buttons.delete')}
                           </button>
@@ -236,7 +277,7 @@ export function LoanTable({loanType, rows, count}: Props) {
                     </tr>
                     {editingLoanId === row.id ? (
                       <tr className="border-t bg-muted/20">
-                        <td colSpan={14} className="px-3 py-3">
+                        <td colSpan={15} className="px-3 py-3">
                           <LoanEditForm
                             loan={row}
                             onClose={() => setEditingLoanId(null)}
@@ -249,7 +290,7 @@ export function LoanTable({loanType, rows, count}: Props) {
               })}
               {rows.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-muted-foreground" colSpan={14}>
+                  <td className="px-3 py-6 text-center text-muted-foreground" colSpan={15}>
                     No records found.
                   </td>
                 </tr>
@@ -277,12 +318,29 @@ export function LoanTable({loanType, rows, count}: Props) {
               </tr>
             </thead>
             <tbody className={isPending ? 'opacity-50' : ''}>
-              {rows.map((row, index) => (
+              {rows.map((row, index) => {
+                const isOverdue = (row.overdueAmount ?? 0) > 0;
+                return (
                 <Fragment key={row.id}>
-                  <tr className="border-t">
+                  <tr
+                    className={`border-t ${
+                      isOverdue
+                        ? 'bg-red-50/70 hover:bg-red-50 dark:bg-red-950/35 dark:hover:bg-red-950/55'
+                        : ''
+                    }`}
+                  >
                     <td className="px-3 py-2">{row.memberNumber}</td>
                     <td className="px-3 py-2">{row.memberNumber}</td>
-                    <td className="px-3 py-2">{row.memberName}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span>{row.memberName}</span>
+                        {isOverdue ? (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700 dark:bg-red-900/60 dark:text-red-200">
+                            Overdue
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 hidden lg:table-cell">{row.cycle}</td>
                     <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.securityAmount)}</td>
                     <td className="px-3 py-2">{row.loanNumber}</td>
@@ -313,8 +371,9 @@ export function LoanTable({loanType, rows, count}: Props) {
                           {t('buttons.edit')}
                         </button>
                         <button
-                          className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50"
+                          className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                           onClick={() => handleDelete(row)}
+                          disabled={profile?.role && profile.role !== 'admin'}
                         >
                           <Trash2 size={12} /> {t('buttons.delete')}
                         </button>
@@ -332,7 +391,7 @@ export function LoanTable({loanType, rows, count}: Props) {
                     </tr>
                   ) : null}
                 </Fragment>
-              ))}
+              )})}
               {rows.length === 0 ? (
                 <tr>
                   <td className="px-3 py-6 text-center text-muted-foreground" colSpan={13}>
@@ -348,6 +407,7 @@ export function LoanTable({loanType, rows, count}: Props) {
       {selectedLoanId && (
         <LoanSchedulesDialog
           loanId={selectedLoanId}
+          loanType={loanType}
           onClose={() => setSelectedLoanId(null)}
         />
       )}

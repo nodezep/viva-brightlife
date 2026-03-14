@@ -18,6 +18,16 @@ export default async function AdminLayout({
     redirect(`/${params.locale}/login`);
   }
 
+  const {data: profile} = await supabase
+    .from('profiles')
+    .select('is_active')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profile?.is_active === false) {
+    redirect(`/${params.locale}/login`);
+  }
+
   return (
     <AdminShell adminEmail={user.email ?? 'admin@brightlife.co.tz'}>
       {children}

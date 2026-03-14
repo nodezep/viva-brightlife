@@ -5,6 +5,7 @@
   },
   "navigation": {
     "dashboard": "Dashboard",
+    "user_management": "User Management",
     "mikopo_binafsi": "Individual Loans",
     "mikopo_wafanyabiashara": "Business Loans",
     "mikopo_watumishi": "Employee Loans",

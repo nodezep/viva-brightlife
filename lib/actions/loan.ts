@@ -146,7 +146,7 @@ export async function createLoanAction(formData: FormData) {
 
   const loanId = data.id;
 
-  // Create weekly schedule (Marejesho) automatically
+  // Create schedules (Marejesho) automatically
   if (loanType !== 'binafsi' && durationWeeks > 0) {
     const schedules = [];
     let remainingAmount = outstandingBalance;
@@ -188,6 +188,43 @@ export async function createLoanAction(formData: FormData) {
 
     if (schedules.length > 0) {
       const { error: scheduleError } = await supabase.from('loan_schedules').insert(schedules);
+      if (scheduleError) {
+        console.error('Failed to create loan schedules:', scheduleError);
+      }
+    }
+  } else if (loanType === 'binafsi' && durationMonths > 0) {
+    // Generate monthly schedules - one entry per month
+    const schedules = [];
+    const addMonths = (date: Date, months: number) => {
+      const d = new Date(date);
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + months);
+      if (d.getDate() < day) {
+        d.setDate(0);
+      }
+      return d;
+    };
+
+    // Calculate monthly installment (total repayment divided by months)
+    const monthlyInstallment = installmentSize / durationMonths;
+
+    for (let month = 1; month <= durationMonths; month++) {
+      const expectedDate = addMonths(new Date(disbursementDate), month)
+        .toISOString()
+        .split('T')[0];
+
+      schedules.push({
+        loan_id: loanId,
+        week_number: month, // Using month number as the entry identifier
+        expected_date: expectedDate,
+        expected_amount: monthlyInstallment,
+        status: 'pending'
+      });
+    }
+
+    if (schedules.length > 0) {
+      const { error: scheduleError } = await supabase.from('loan_schedules').insert(schedules);
+
       if (scheduleError) {
         console.error('Failed to create loan schedules:', scheduleError);
       }
@@ -346,6 +383,54 @@ export async function updateLoanAction(formData: FormData) {
       const {error: scheduleError} = await supabase
         .from('loan_schedules')
         .insert(schedules);
+      if (scheduleError) {
+        return {error: scheduleError.message};
+      }
+    }
+  } else if (loanType === 'binafsi' && durationMonths > 0) {
+    const {error: deleteError} = await supabase
+      .from('loan_schedules')
+      .delete()
+      .eq('loan_id', loanId);
+
+    if (deleteError) {
+      return {error: deleteError.message};
+    }
+
+    // Generate monthly schedules - one entry per month
+    const schedules = [];
+    const addMonths = (date: Date, months: number) => {
+      const d = new Date(date);
+      const day = d.getDate();
+      d.setMonth(d.getMonth() + months);
+      if (d.getDate() < day) {
+        d.setDate(0);
+      }
+      return d;
+    };
+
+    // Calculate monthly installment (total repayment divided by months)
+    const monthlyInstallment = installmentSize / durationMonths;
+
+    for (let month = 1; month <= durationMonths; month++) {
+      const expectedDate = addMonths(new Date(disbursementDate), month)
+        .toISOString()
+        .split('T')[0];
+
+      schedules.push({
+        loan_id: loanId,
+        week_number: month, // Using month number as the entry identifier
+        expected_date: expectedDate,
+        expected_amount: monthlyInstallment,
+        status: 'pending'
+      });
+    }
+
+    if (schedules.length > 0) {
+      const {error: scheduleError} = await supabase
+        .from('loan_schedules')
+        .insert(schedules);
+
       if (scheduleError) {
         return {error: scheduleError.message};
       }

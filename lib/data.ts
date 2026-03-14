@@ -30,6 +30,62 @@ function pickSingleRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
+type OverdueMetrics = {
+  daysOverdue: number;
+  overdueAmount: number;
+};
+
+async function getOverdueMetricsForLoans(
+  supabase: ReturnType<typeof createClient>,
+  loanIds: string[]
+): Promise<Map<string, OverdueMetrics>> {
+  const metrics = new Map<string, OverdueMetrics>();
+  if (loanIds.length === 0) {
+    return metrics;
+  }
+
+  const {data, error} = await supabase
+    .from('loan_schedules')
+    .select('loan_id, expected_date, expected_amount, paid_amount')
+    .in('loan_id', loanIds);
+
+  if (error || !data) {
+    return metrics;
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [todayYear, todayMonth, todayDay] = todayStr.split('-').map(Number);
+  const todayUtc = Date.UTC(todayYear, (todayMonth ?? 1) - 1, todayDay ?? 1);
+
+  data.forEach((row) => {
+    if (!row.expected_date) {
+      return;
+    }
+    const expectedAmount = Number(row.expected_amount ?? 0);
+    const paidAmount = Number(row.paid_amount ?? 0);
+    if (paidAmount >= expectedAmount) {
+      return;
+    }
+    const expectedDateStr = row.expected_date;
+    if (expectedDateStr > todayStr) {
+      return;
+    }
+    const [year, month, day] = expectedDateStr.split('-').map(Number);
+    if (!year || !month || !day) {
+      return;
+    }
+    const expectedUtc = Date.UTC(year, month - 1, day);
+    const overdueDays = Math.max(0, Math.floor((todayUtc - expectedUtc) / 86400000));
+
+    const current = metrics.get(row.loan_id) ?? {daysOverdue: 0, overdueAmount: 0};
+    current.overdueAmount += Math.max(expectedAmount - paidAmount, 0);
+    current.daysOverdue = Math.max(current.daysOverdue, overdueDays);
+    metrics.set(row.loan_id, current);
+  });
+
+  return metrics;
+}
+
 function toLoanRecord(row: LoanRow): LoanRecord {
   const member = pickSingleRelation(row.members);
 
@@ -142,8 +198,24 @@ export async function getLoansByType(
     return { data: [], count: 0 };
   }
 
+  const records = (data as unknown as LoanRow[]).map(toLoanRecord);
+  const overdueMetrics = await getOverdueMetricsForLoans(
+    supabase,
+    records.map((record) => record.id)
+  );
+
   return {
-    data: (data as unknown as LoanRow[]).map(toLoanRecord),
+    data: records.map((record) => {
+      const metrics = overdueMetrics.get(record.id);
+      if (!metrics) {
+        return {...record, daysOverdue: record.daysOverdue ?? 0, overdueAmount: record.overdueAmount ?? 0};
+      }
+      return {
+        ...record,
+        daysOverdue: metrics.daysOverdue,
+        overdueAmount: metrics.overdueAmount
+      };
+    }),
     count: count ?? 0
   };
 }
@@ -161,7 +233,23 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
     return [];
   }
 
-  return (data as unknown as LoanRow[]).map(toLoanRecord);
+  const records = (data as unknown as LoanRow[]).map(toLoanRecord);
+  const overdueMetrics = await getOverdueMetricsForLoans(
+    supabase,
+    records.map((record) => record.id)
+  );
+
+  return records.map((record) => {
+    const metrics = overdueMetrics.get(record.id);
+    if (!metrics) {
+      return {...record, daysOverdue: record.daysOverdue ?? 0, overdueAmount: record.overdueAmount ?? 0};
+    }
+    return {
+      ...record,
+      daysOverdue: metrics.daysOverdue,
+      overdueAmount: metrics.overdueAmount
+    };
+  });
 }
 
 export type MarejeshoSchedule = {
@@ -240,101 +328,179 @@ export async function getMarejeshoReportRows(): Promise<MarejeshoRow[]> {
   });
 }
 
-export async function getDashboardMetrics() {
+type DashboardRange = 'all' | 'month';
+
+type DashboardMetricOptions = {
+  range?: DashboardRange;
+  month?: string;
+};
+
+export async function getDashboardMetrics(options: DashboardMetricOptions = {}) {
   const supabase = createClient();
   const today = new Date().toISOString().slice(0, 10);
+  const range: DashboardRange = options.range === 'month' ? 'month' : 'all';
+
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const month = options.month && /^\d{4}-\d{2}$/.test(options.month)
+    ? options.month
+    : defaultMonth;
+
+  const [year, monthIndex] = month.split('-').map(Number);
+  const startDate =
+    range === 'month' && year && monthIndex
+      ? new Date(year, monthIndex - 1, 1).toISOString().slice(0, 10)
+      : null;
+  const endDate =
+    range === 'month' && year && monthIndex
+      ? new Date(year, monthIndex, 0).toISOString().slice(0, 10)
+      : null;
+
+  let activeLoansQuery = supabase
+    .from('loans')
+    .select('*', {count: 'exact', head: true})
+    .eq('status', 'active');
+
+  let disbursedQuery = supabase.from('loans').select('principal_amount,disbursement_date');
+
+  let loanTypeQuery = supabase
+    .from('loans')
+    .select('loan_type,status,principal_amount,outstanding_balance,disbursement_date');
+
+  if (range === 'month' && startDate && endDate) {
+    activeLoansQuery = activeLoansQuery
+      .gte('disbursement_date', startDate)
+      .lte('disbursement_date', endDate);
+    disbursedQuery = disbursedQuery
+      .gte('disbursement_date', startDate)
+      .lte('disbursement_date', endDate);
+    loanTypeQuery = loanTypeQuery
+      .gte('disbursement_date', startDate)
+      .lte('disbursement_date', endDate);
+  }
+
+  let scheduleQuery = supabase
+    .from('loan_schedules')
+    .select('loan_id,expected_amount,paid_amount,expected_date,loans!inner(loan_type)');
+
+  if (range === 'month' && startDate && endDate) {
+    scheduleQuery = scheduleQuery
+      .gte('expected_date', startDate)
+      .lte('expected_date', endDate);
+  }
 
   const [
     {count: activeLoans},
     {data: disbursedRows},
-    {data: schedulePaidRows},
-    {data: overdueScheduleRows},
+    {data: scheduleRows},
     {count: members},
     {count: groups},
     {data: loanTypeRows}
   ] = await Promise.all([
-    supabase
-      .from('loans')
-      .select('*', {count: 'exact', head: true})
-      .eq('status', 'active'),
-    supabase
-      .from('loans')
-      .select('principal_amount,disbursement_date')
-      .gte(
-        'disbursement_date',
-        new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          .toISOString()
-          .slice(0, 10)
-      ),
-    supabase.from('loan_schedules').select('paid_amount'),
-    supabase
-      .from('loan_schedules')
-      .select('loan_id, expected_amount, paid_amount, expected_date')
-      .lt('expected_date', today),
+    activeLoansQuery,
+    disbursedQuery,
+    scheduleQuery,
     supabase.from('members').select('*', {count: 'exact', head: true}),
     supabase.from('groups').select('*', {count: 'exact', head: true}),
-    supabase
-      .from('loans')
-      .select('loan_type,status,principal_amount,outstanding_balance')
+    loanTypeQuery
   ]);
 
-  const totalDisbursedThisMonth = (disbursedRows ?? []).reduce(
+  const totalDisbursed = (disbursedRows ?? []).reduce(
     (sum, row) => sum + Number(row.principal_amount ?? 0),
     0
   );
 
-  const totalCollections = (schedulePaidRows ?? []).reduce(
+  const totalCollections = (scheduleRows ?? []).reduce(
     (sum, row) => sum + Number(row.paid_amount ?? 0),
     0
   );
 
   const overdueLoanIds = new Set<string>();
-  (overdueScheduleRows ?? []).forEach((row) => {
+  (scheduleRows ?? []).forEach((row) => {
     const expected = Number(row.expected_amount ?? 0);
     const paid = Number(row.paid_amount ?? 0);
-    if (paid < expected) {
+    if (row.expected_date < today && paid < expected) {
       overdueLoanIds.add(row.loan_id);
     }
   });
 
+  const scheduleTotalsByType = (scheduleRows ?? []).reduce(
+    (acc, row) => {
+      const loanType = (row as {loans?: {loan_type?: LoanType}}).loans?.loan_type;
+      if (!loanType) {
+        return acc;
+      }
+      if (!acc[loanType]) {
+        acc[loanType] = {dueAmount: 0, collectedAmount: 0};
+      }
+      acc[loanType].dueAmount += Number(row.expected_amount ?? 0);
+      acc[loanType].collectedAmount += Number(row.paid_amount ?? 0);
+      return acc;
+    },
+    {} as Record<LoanType, {dueAmount: number; collectedAmount: number}>
+  );
+
+  const loanTypeMetrics = (loanTypeRows ?? []).reduce(
+    (acc, row) => {
+      const type = row.loan_type as LoanType;
+      if (!acc[type]) {
+        acc[type] = {
+          loanType: type,
+          totalCount: 0,
+          activeCount: 0,
+          disbursedAmount: 0,
+          outstandingBalance: 0,
+          dueAmount: 0,
+          collectedAmount: 0
+        };
+      }
+      acc[type].totalCount += 1;
+      if (row.status === 'active') {
+        acc[type].activeCount += 1;
+      }
+      acc[type].disbursedAmount += Number(row.principal_amount ?? 0);
+      acc[type].outstandingBalance += Number(row.outstanding_balance ?? 0);
+      return acc;
+    },
+    {} as Record<
+      LoanType,
+      {
+        loanType: LoanType;
+        totalCount: number;
+        activeCount: number;
+        disbursedAmount: number;
+        outstandingBalance: number;
+        dueAmount: number;
+        collectedAmount: number;
+      }
+    >
+  );
+
+  Object.entries(scheduleTotalsByType).forEach(([type, totals]) => {
+    const loanType = type as LoanType;
+    if (!loanTypeMetrics[loanType]) {
+      loanTypeMetrics[loanType] = {
+        loanType,
+        totalCount: 0,
+        activeCount: 0,
+        disbursedAmount: 0,
+        outstandingBalance: 0,
+        dueAmount: 0,
+        collectedAmount: 0
+      };
+    }
+    loanTypeMetrics[loanType].dueAmount = totals.dueAmount;
+    loanTypeMetrics[loanType].collectedAmount = totals.collectedAmount;
+  });
+
   return {
     totalActiveLoans: activeLoans ?? 0,
-    totalDisbursedThisMonth,
+    totalDisbursed,
     totalCollections,
     overdueLoans: overdueLoanIds.size,
     activeMembers: members ?? 0,
     activeGroups: groups ?? 0,
-    loanTypeMetrics: (loanTypeRows ?? []).reduce(
-      (acc, row) => {
-        const type = row.loan_type as LoanType;
-        if (!acc[type]) {
-          acc[type] = {
-            loanType: type,
-            totalCount: 0,
-            activeCount: 0,
-            disbursedAmount: 0,
-            outstandingBalance: 0
-          };
-        }
-        acc[type].totalCount += 1;
-        if (row.status === 'active') {
-          acc[type].activeCount += 1;
-        }
-        acc[type].disbursedAmount += Number(row.principal_amount ?? 0);
-        acc[type].outstandingBalance += Number(row.outstanding_balance ?? 0);
-        return acc;
-      },
-      {} as Record<
-        LoanType,
-        {
-          loanType: LoanType;
-          totalCount: number;
-          activeCount: number;
-          disbursedAmount: number;
-          outstandingBalance: number;
-        }
-      >
-    )
+    loanTypeMetrics
   };
 }
 
@@ -521,7 +687,23 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
     return [];
   }
 
-  return (data as unknown as LoanRow[]).map(toLoanRecord);
+  const records = (data as unknown as LoanRow[]).map(toLoanRecord);
+  const overdueMetrics = await getOverdueMetricsForLoans(
+    supabase,
+    records.map((record) => record.id)
+  );
+
+  return records.map((record) => {
+    const metrics = overdueMetrics.get(record.id);
+    if (!metrics) {
+      return {...record, daysOverdue: record.daysOverdue ?? 0, overdueAmount: record.overdueAmount ?? 0};
+    }
+    return {
+      ...record,
+      daysOverdue: metrics.daysOverdue,
+      overdueAmount: metrics.overdueAmount
+    };
+  });
 }
 
 export type AdmissionBookRow = {

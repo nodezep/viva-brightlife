@@ -13,11 +13,12 @@ import {useLocale, useTranslations} from 'next-intl';
 import Link from 'next/link';
 import type {LoanType} from '@/types';
 import {BrandLogo} from '@/components/layout/brand-logo';
+import {usePathname, useRouter} from '@/lib/navigation';
 
 type Props = {
   metrics: {
     totalActiveLoans: number;
-    totalDisbursedThisMonth: number;
+    totalDisbursed: number;
     totalCollections: number;
     overdueLoans: number;
     activeMembers: number;
@@ -30,9 +31,13 @@ type Props = {
         activeCount: number;
         disbursedAmount: number;
         outstandingBalance: number;
+        dueAmount: number;
+        collectedAmount: number;
       }
     >;
   };
+  range: 'all' | 'month';
+  month: string;
 };
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -41,10 +46,33 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0
 });
 
-export function DashboardOverview({metrics}: Props) {
+export function DashboardOverview({metrics, range, month}: Props) {
   const t = useTranslations('dashboard');
   const nav = useTranslations('navigation');
   const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const rangeLabel = useMemo(() => {
+    if (range === 'all') {
+      return 'All time';
+    }
+    const parsed = new Date(`${month}-01T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) {
+      return month;
+    }
+    return new Intl.DateTimeFormat(locale, {month: 'long', year: 'numeric'}).format(parsed);
+  }, [locale, month, range]);
+
+  const updateRange = (nextRange: 'all' | 'month', nextMonth: string) => {
+    const params = new URLSearchParams();
+    if (nextRange === 'month') {
+      params.set('range', 'month');
+      params.set('month', nextMonth);
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  };
 
   const stats = useMemo(
     () => [
@@ -55,7 +83,7 @@ export function DashboardOverview({metrics}: Props) {
       },
       {
         label: t('total_disbursed_month'),
-        value: currency.format(metrics.totalDisbursedThisMonth),
+        value: currency.format(metrics.totalDisbursed),
         icon: HandCoins
       },
       {
@@ -109,7 +137,7 @@ export function DashboardOverview({metrics}: Props) {
       <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-primary/10 via-card to-amber-100/40 p-5 dark:from-primary/15 dark:to-amber-500/10">
         <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-primary/15 blur-2xl" />
         <div className="absolute -bottom-20 left-1/3 h-44 w-44 rounded-full bg-amber-300/20 blur-2xl" />
-        <div className="relative flex items-center justify-between gap-4">
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
               Executive Overview
@@ -118,12 +146,45 @@ export function DashboardOverview({metrics}: Props) {
             <p className="mt-1 text-sm text-muted-foreground">
               Live operations snapshot for loans, collections and portfolio health.
             </p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary/80">
+              Range: {rangeLabel}
+            </p>
           </div>
-          <div className="hidden items-center gap-3 rounded-xl border bg-card/80 px-3 py-2 shadow-sm sm:flex">
-            <BrandLogo size={46} />
-            <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Viva Brightlife</p>
-              <p className="text-sm font-semibold">Microfinance Co. Ltd</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl border bg-card/80 px-3 py-2 shadow-sm">
+              <label className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Range
+              </label>
+              <select
+                className="rounded-md border bg-background px-2 py-1 text-sm"
+                value={range}
+                onChange={(event) =>
+                  updateRange(
+                    event.target.value === 'month' ? 'month' : 'all',
+                    month
+                  )
+                }
+              >
+                <option value="all">All time</option>
+                <option value="month">Month</option>
+              </select>
+              {range === 'month' ? (
+                <input
+                  type="month"
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                  value={month}
+                  onChange={(event) => updateRange('month', event.target.value)}
+                />
+              ) : null}
+            </div>
+            <div className="hidden items-center gap-3 rounded-xl border bg-card/80 px-3 py-2 shadow-sm sm:flex">
+              <BrandLogo size={46} />
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  Viva Brightlife
+                </p>
+                <p className="text-sm font-semibold">Microfinance Co. Ltd</p>
+              </div>
             </div>
           </div>
         </div>
@@ -188,6 +249,18 @@ export function DashboardOverview({metrics}: Props) {
                     <span>{t('outstanding_balance')}</span>
                     <span className="text-foreground">
                       {currency.format(metricsForType?.outstandingBalance ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Due (range)</span>
+                    <span className="text-foreground">
+                      {currency.format(metricsForType?.dueAmount ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Collected (range)</span>
+                    <span className="text-foreground">
+                      {currency.format(metricsForType?.collectedAmount ?? 0)}
                     </span>
                   </div>
                 </div>

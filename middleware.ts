@@ -34,7 +34,27 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  // Attempt to get user, but handle errors gracefully
+  // This prevents "Refresh Token Not Found" errors from breaking the app
+  const authResult = await supabase.auth.getUser();
+  const user = authResult.data?.user;
+  const authError = authResult.error;
+
+  // If there's an auth error (e.g., invalid/expired refresh token),
+  // clear the auth cookies to allow fresh login
+  if (authError || !user) {
+    // Clear all auth-related cookies by setting them to expire immediately
+    const cookieNames = ['sb-access-token', 'sb-refresh-token', 'supabase-auth-token'];
+    cookieNames.forEach(name => {
+      response.cookies.set(name, '', {
+        path: '/',
+        expires: new Date(0),
+        httpOnly: true,
+        sameSite: 'lax'
+      });
+    });
+  }
+
   return response;
 }
 

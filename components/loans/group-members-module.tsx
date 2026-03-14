@@ -8,6 +8,7 @@ import type {LoanRecord} from '@/types';
 import {LoanTable} from './loan-table';
 import {GroupLoanFormDialog} from './group-loan-form-dialog';
 import {getLoanSchedulesAction} from '@/lib/actions/loan-schedules';
+import {useProfile} from '@/lib/hooks/use-profile';
 import ExcelJS from 'exceljs';
 
 type Props = {
@@ -32,6 +33,8 @@ export function GroupMembersModule({group, loans}: Props) {
   const [editPhone, setEditPhone] = useState('');
   const [editRole, setEditRole] = useState('Member');
   const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+  const {profile} = useProfile();
+  const [permissionError, setPermissionError] = useState('');
   const [exportMonth, setExportMonth] = useState(() => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -180,6 +183,12 @@ export function GroupMembersModule({group, loans}: Props) {
   };
 
   const removeMember = async (memberId: string) => {
+    if (profile?.role && profile.role !== 'admin') {
+      setPermissionError(
+        'Delete is restricted to admins. Please contact the admin for this action.'
+      );
+      return;
+    }
     const response = await fetch(`/api/groups/${group.id}/members?memberId=${memberId}`, {
       method: 'DELETE'
     });
@@ -376,6 +385,11 @@ export function GroupMembersModule({group, loans}: Props) {
                   {error}
                 </p>
               ) : null}
+              {permissionError ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {permissionError}
+                </p>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setShowNewRow((value) => !value)}
@@ -532,8 +546,9 @@ export function GroupMembersModule({group, loans}: Props) {
                             Edit
                           </button>
                           <button
-                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => void removeMember(member.memberId)}
+                            disabled={profile?.role && profile.role !== 'admin'}
                           >
                             <Trash2 size={12} /> Delete
                           </button>

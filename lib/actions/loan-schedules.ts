@@ -15,7 +15,82 @@ export async function getLoanSchedulesAction(loanId: string) {
     throw new Error(error.message);
   }
 
-  return data;
+  if (data && data.length > 0) {
+    return data;
+  }
+
+  const {data: loanRow, error: loanError} = await supabase
+    .from('loans')
+    .select('loan_type, disbursement_date, duration_months, weekly_installment')
+    .eq('id', loanId)
+    .single();
+
+  if (loanError || !loanRow) {
+    return data;
+  }
+
+  if (loanRow.loan_type !== 'binafsi') {
+    return data;
+  }
+
+  const durationMonths = Number(loanRow.duration_months ?? 0);
+  if (durationMonths <= 0) {
+    return data;
+  }
+
+  const totalRepay = Number(loanRow.weekly_installment ?? 0);
+  if (totalRepay <= 0) {
+    return data;
+  }
+
+  const addMonths = (date: Date, months: number) => {
+    const d = new Date(date);
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    if (d.getDate() < day) {
+      d.setDate(0);
+    }
+    return d;
+  };
+
+  const monthlyInstallment = totalRepay / durationMonths;
+  const schedules = [];
+  const disbursementDate = new Date(loanRow.disbursement_date);
+
+  for (let month = 1; month <= durationMonths; month++) {
+    const expectedDate = addMonths(disbursementDate, month)
+      .toISOString()
+      .split('T')[0];
+    schedules.push({
+      loan_id: loanId,
+      week_number: month,
+      expected_date: expectedDate,
+      expected_amount: monthlyInstallment,
+      status: 'pending'
+    });
+  }
+
+  if (schedules.length > 0) {
+    const {error: scheduleError} = await supabase
+      .from('loan_schedules')
+      .insert(schedules);
+    if (scheduleError) {
+      console.error('Failed to create loan schedules:', scheduleError);
+      return data;
+    }
+  }
+
+  const {data: freshSchedules, error: refreshError} = await supabase
+    .from('loan_schedules')
+    .select('*')
+    .eq('loan_id', loanId)
+    .order('week_number', {ascending: true});
+
+  if (refreshError) {
+    return data;
+  }
+
+  return freshSchedules;
 }
 
 export async function updateScheduleStatusAction(scheduleId: string, status: string) {

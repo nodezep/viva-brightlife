@@ -2,6 +2,7 @@ import type {LoanType, NavItem} from '@/types';
 
 export const navItems: NavItem[] = [
   {key: 'dashboard', href: '/dashboard', icon: 'LayoutDashboard'},
+  {key: 'user_management', href: '/users', icon: 'Users2'},
   {key: 'mikopo_binafsi', href: '/mikopo-binafsi', icon: 'Wallet'},
   {key: 'mikopo_wafanyabiashara', href: '/mikopo-wafanyabiashara', icon: 'Briefcase'},
   {key: 'mikopo_watumishi', href: '/mikopo-watumishi', icon: 'Users2'},
