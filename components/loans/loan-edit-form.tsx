@@ -21,6 +21,9 @@ export function LoanEditForm({loan, onClose}: Props) {
   const [totalRepay, setTotalRepay] = useState(String(loan.outstandingBalance ?? ''));
   const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState(String(loan.installmentSize ?? ''));
+  const [repaymentFrequency, setRepaymentFrequency] = useState<'weekly' | 'daily'>(
+    loan.repaymentFrequency === 'daily' ? 'daily' : 'weekly'
+  );
 
   const [principal, setPrincipal] = useState(String(loan.disbursementAmount ?? ''));
   const [principalDisplay, setPrincipalDisplay] = useState('');
@@ -85,11 +88,11 @@ export function LoanEditForm({loan, onClose}: Props) {
     const repayVal = Number(totalRepay);
     const weeksVal = Number(durationWeeks);
     if (repayVal > 0 && weeksVal > 0) {
-      const perWeek = repayVal / weeksVal;
-      const suggested = Math.ceil(perWeek / 100) * 100;
-      setInstallment(suggested.toString());
-    }
-  }, [totalRepay, durationWeeks]);
+    const perPeriod = repayVal / weeksVal;
+    const suggested = Math.ceil(perPeriod / 100) * 100;
+    setInstallment(suggested.toString());
+  }
+}, [totalRepay, durationWeeks]);
 
   useEffect(() => {
     setDisbursementAmountDisplay(formatNumber(disbursementAmount));
@@ -309,10 +312,27 @@ export function LoanEditForm({loan, onClose}: Props) {
         }}
       />
       <input type="hidden" name="outstandingBalance" value={totalRepay} />
+      {loan.loanType !== 'vikundi_wakinamama' ? (
+        <select
+          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          value={repaymentFrequency}
+          onChange={(e) => setRepaymentFrequency(e.target.value as 'weekly' | 'daily')}
+          name="repaymentFrequency"
+        >
+          <option value="weekly">Weekly</option>
+          <option value="daily">Daily</option>
+        </select>
+      ) : (
+        <input type="hidden" name="repaymentFrequency" value="weekly" />
+      )}
       <input
         type="number"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder="Duration (Weeks) - to regenerate schedule"
+        placeholder={
+          repaymentFrequency === 'daily'
+            ? 'Duration (Days) - to regenerate schedule'
+            : 'Duration (Weeks) - to regenerate schedule'
+        }
         name="durationWeeks"
         value={durationWeeks}
         onChange={(e) => setDurationWeeks(e.target.value)}

@@ -24,6 +24,7 @@ export type LoanRecord = {
   overdueAmount: number;
   status: LoanStatus;
   loanType: LoanType;
+  repaymentFrequency?: 'weekly' | 'daily';
   durationMonths?: number;
   amountPaid?: number;
   memberPhone?: string | null;

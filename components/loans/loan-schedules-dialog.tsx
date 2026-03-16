@@ -121,39 +121,55 @@ export function LoanSchedulesDialog({loanId, loanType, onClose}: Props) {
                   </td>
                 </tr>
               ) : (
-                schedules.map((schedule) => (
+                schedules.map((schedule, index) => (
                   <tr key={schedule.id} className="border-t hover:bg-muted/50 transition-colors">
-                    <td className="px-4 py-3 font-medium">{schedule.week_number}</td>
-                    <td className="px-4 py-3">{schedule.expected_date}</td>
-                    <td className="px-4 py-3">
-                      {new Intl.NumberFormat('en-US', {style: 'currency', currency: 'TZS', maximumFractionDigits: 0}).format(schedule.expected_amount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {new Intl.NumberFormat('en-US', {style: 'currency', currency: 'TZS', maximumFractionDigits: 0}).format(schedule.paid_amount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                        schedule.status === 'paid' ? 'bg-green-100 text-green-700' :
-                        schedule.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                        schedule.status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {schedule.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleUpdate(schedule.id, schedule.status, schedule.expected_amount)}
-                        disabled={isPending}
-                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                          schedule.status === 'paid' 
-                          ? 'bg-muted text-muted-foreground hover:bg-muted/80' 
-                          : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        }`}
-                      >
-                        {schedule.status === 'paid' ? 'Mark Pending' : 'Mark Paid'}
-                      </button>
-                    </td>
+                    {(() => {
+                      const isPaid = schedule.status === 'paid';
+                      const hasPreviousUnpaid =
+                        index > 0 && schedules[index - 1]?.status !== 'paid';
+                      return (
+                        <>
+                          <td className="px-4 py-3 font-medium">{schedule.week_number}</td>
+                          <td className="px-4 py-3">{schedule.expected_date}</td>
+                          <td className="px-4 py-3">
+                            {new Intl.NumberFormat('en-US', {style: 'currency', currency: 'TZS', maximumFractionDigits: 0}).format(schedule.expected_amount)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {new Intl.NumberFormat('en-US', {style: 'currency', currency: 'TZS', maximumFractionDigits: 0}).format(schedule.paid_amount)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                              schedule.status === 'paid' ? 'bg-green-100 text-green-700' :
+                              schedule.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                              schedule.status === 'partial' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {schedule.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => handleUpdate(schedule.id, schedule.status, schedule.expected_amount)}
+                              disabled={isPending || (!isPaid && hasPreviousUnpaid)}
+                              title={
+                                !isPaid && hasPreviousUnpaid
+                                  ? 'Mark previous installment first'
+                                  : undefined
+                              }
+                              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                isPaid 
+                                ? 'bg-muted text-muted-foreground hover:bg-muted/80' 
+                                : hasPreviousUnpaid
+                                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                              }`}
+                            >
+                              {isPaid ? 'Mark Pending' : 'Mark Paid'}
+                            </button>
+                          </td>
+                        </>
+                      );
+                    })()}
                   </tr>
                 ))
               )}

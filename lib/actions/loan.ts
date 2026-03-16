@@ -23,6 +23,7 @@ export async function createLoanAction(formData: FormData) {
   const amountPaid = Number(formData.get('amountPaid') || 0);
   const memberPhone = formData.get('memberPhone') as string | null;
   const daysOverdue = Number(formData.get('daysOverdue') || 0);
+  const repaymentFrequency = (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
   const durationWeeksRaw = formData.get('durationWeeks');
   const durationWeeks =
     durationWeeksRaw === null || durationWeeksRaw === ''
@@ -136,6 +137,8 @@ export async function createLoanAction(formData: FormData) {
     insertPayload.amount_withdrawn = amountPaid;
     insertPayload.interest_rate = interestRatePercent;
     insertPayload.days_overdue = daysOverdue;
+  } else {
+    insertPayload.repayment_frequency = repaymentFrequency;
   }
 
   const {data, error} = await supabase.from('loans').insert(insertPayload).select('id').single();
@@ -151,6 +154,7 @@ export async function createLoanAction(formData: FormData) {
     const schedules = [];
     let remainingAmount = outstandingBalance;
     let currentDate = new Date(disbursementDate);
+    const isDaily = repaymentFrequency === 'daily';
 
     const addMonths = (date: Date, months: number) => {
       const d = new Date(date);
@@ -162,11 +166,13 @@ export async function createLoanAction(formData: FormData) {
       return d;
     };
 
-    // One-month grace period before first weekly payment
-    currentDate = addMonths(currentDate, 1);
+    if (!isDaily) {
+      // One-month grace period before first weekly payment
+      currentDate = addMonths(currentDate, 1);
+    }
 
     for (let i = 1; i <= durationWeeks; i++) {
-      currentDate.setDate(currentDate.getDate() + 7);
+      currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
       
       const isLastWeek = i === durationWeeks;
       // If it's the last week, pay all remaining. Otherwise math.min
@@ -265,6 +271,7 @@ export async function updateLoanAction(formData: FormData) {
   const amountPaid = Number(formData.get('amountPaid') || 0);
   const memberPhone = formData.get('memberPhone') as string | null;
   const daysOverdue = Number(formData.get('daysOverdue') || 0);
+  const repaymentFrequency = (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
   const durationWeeksRaw = formData.get('durationWeeks');
   const durationWeeks =
     durationWeeksRaw === null || durationWeeksRaw === ''
@@ -327,6 +334,8 @@ export async function updateLoanAction(formData: FormData) {
     updatePayload.amount_withdrawn = amountPaid;
     updatePayload.interest_rate = interestRatePercent;
     updatePayload.days_overdue = daysOverdue;
+  } else {
+    updatePayload.repayment_frequency = repaymentFrequency;
   }
 
   const {error: updateError} = await supabase.from('loans').update(updatePayload).eq('id', loanId);
@@ -348,6 +357,7 @@ export async function updateLoanAction(formData: FormData) {
     const schedules = [];
     let remainingAmount = outstandingBalance;
     let currentDate = new Date(disbursementDate);
+    const isDaily = repaymentFrequency === 'daily';
 
     const addMonths = (date: Date, months: number) => {
       const d = new Date(date);
@@ -359,11 +369,13 @@ export async function updateLoanAction(formData: FormData) {
       return d;
     };
 
-    // One-month grace period before first weekly payment
-    currentDate = addMonths(currentDate, 1);
+    if (!isDaily) {
+      // One-month grace period before first weekly payment
+      currentDate = addMonths(currentDate, 1);
+    }
 
     for (let i = 1; i <= durationWeeks; i++) {
-      currentDate.setDate(currentDate.getDate() + 7);
+      currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
       const isLastWeek = i === durationWeeks;
       let expectedAmount = isLastWeek
         ? remainingAmount

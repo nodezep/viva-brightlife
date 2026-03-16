@@ -22,6 +22,7 @@ export function LoanForm({loanType, onClose}: Props) {
   const [totalRepay, setTotalRepay] = useState('');
   const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState('');
+  const [repaymentFrequency, setRepaymentFrequency] = useState<'weekly' | 'daily'>('weekly');
 
   // Individual loan (binafsi) states
   const [principal, setPrincipal] = useState('');
@@ -48,9 +49,9 @@ export function LoanForm({loanType, onClose}: Props) {
     const repayVal = Number(totalRepay);
     const weeksVal = Number(durationWeeks);
     if (repayVal > 0 && weeksVal > 0) {
-      const perWeek = repayVal / weeksVal;
+      const perPeriod = repayVal / weeksVal;
       // Round to nearest 100 as per common microfinance practice
-      const suggested = Math.ceil(perWeek / 100) * 100;
+      const suggested = Math.ceil(perPeriod / 100) * 100;
       setInstallment(suggested.toString());
     } else if (!repayVal || !weeksVal) {
       setInstallment('');
@@ -260,11 +261,24 @@ export function LoanForm({loanType, onClose}: Props) {
         }}
       />
       <input type="hidden" name="outstandingBalance" value={totalRepay} />
+      {loanType !== 'vikundi_wakinamama' ? (
+        <select
+          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          value={repaymentFrequency}
+          onChange={(e) => setRepaymentFrequency(e.target.value as 'weekly' | 'daily')}
+          name="repaymentFrequency"
+        >
+          <option value="weekly">Weekly</option>
+          <option value="daily">Daily</option>
+        </select>
+      ) : (
+        <input type="hidden" name="repaymentFrequency" value="weekly" />
+      )}
       <input
         required
         type="number"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder="Duration (Weeks)"
+        placeholder={repaymentFrequency === 'daily' ? 'Duration (Days)' : 'Duration (Weeks)'}
         name="durationWeeks"
         value={durationWeeks}
         onChange={(e) => setDurationWeeks(e.target.value)}

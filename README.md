@@ -50,10 +50,13 @@ Set in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `SMS_PROVIDER` (`mock` or `twilio`)
+- `SMS_PROVIDER` (`mock`, `twilio`, or `africastalking`)
 - `SMS_FROM`
 - `TWILIO_ACCOUNT_SID` (if using twilio)
 - `TWILIO_AUTH_TOKEN` (if using twilio)
+- `AFRICASTALKING_USERNAME` (if using Africa's Talking)
+- `AFRICASTALKING_API_KEY` (if using Africa's Talking)
+- `DEBUG_SMS` (`true` to log provider responses in dev)
 - `APP_BASE_URL` (public base URL used for Twilio callbacks)
 - `SMS_WEBHOOK_SECRET` (protects webhook route)
 - `JOB_SECRET`
@@ -73,6 +76,17 @@ npm run dev
 
 6. Open:
 - `http://localhost:3000/sw/login` (or `/en/login`)
+
+## Safe Deployment Checklist
+- Keep `.env.local` out of git (never commit secrets).
+- Store secrets in Netlify Environment Variables.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code.
+- Verify Supabase RLS policies are restrictive (especially `loan_schedules`).
+- Rotate keys immediately if they are ever exposed.
+- Run secret scan before every push:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/check-secrets.ps1
+```
 
 ## SMS Reminders
 Admin UI page:

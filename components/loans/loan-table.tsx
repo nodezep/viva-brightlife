@@ -206,8 +206,6 @@ export function LoanTable({loanType, rows, count}: Props) {
             <tbody className={isPending ? 'opacity-50' : ''}>
               {rows.map((row, index) => {
                 const returnDate = addMonthsToIso(row.disbursementDate, row.cycle);
-                const isOverdue =
-                  (row.daysOverdue ?? 0) > 0 || (row.overdueAmount ?? 0) > 0;
                 const ratePercent =
                   row.interestRate && row.interestRate > 0
                     ? row.interestRate
@@ -218,24 +216,9 @@ export function LoanTable({loanType, rows, count}: Props) {
                   ratePercent <= 1 ? ratePercent : ratePercent / 100;
                 return (
                   <Fragment key={row.id}>
-                    <tr
-                      className={`border-t ${
-                        isOverdue
-                          ? 'bg-red-50/70 hover:bg-red-50 dark:bg-red-950/35 dark:hover:bg-red-950/55'
-                          : ''
-                      }`}
-                    >
+                    <tr className="border-t">
                       <td className="px-3 py-2">{index + 1}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span>{row.memberName}</span>
-                          {isOverdue ? (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700 dark:bg-red-900/60 dark:text-red-200">
-                              Overdue
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
+                      <td className="px-3 py-2">{row.memberName}</td>
                       <td className="px-3 py-2">{currency.format(row.disbursementAmount)}</td>
                       <td className="px-3 py-2">{row.disbursementDate}</td>
                       <td className="px-3 py-2">{returnDate}</td>
@@ -318,29 +301,12 @@ export function LoanTable({loanType, rows, count}: Props) {
               </tr>
             </thead>
             <tbody className={isPending ? 'opacity-50' : ''}>
-              {rows.map((row, index) => {
-                const isOverdue = (row.overdueAmount ?? 0) > 0;
-                return (
+              {rows.map((row, index) => (
                 <Fragment key={row.id}>
-                  <tr
-                    className={`border-t ${
-                      isOverdue
-                        ? 'bg-red-50/70 hover:bg-red-50 dark:bg-red-950/35 dark:hover:bg-red-950/55'
-                        : ''
-                    }`}
-                  >
+                  <tr className="border-t">
                     <td className="px-3 py-2">{row.memberNumber}</td>
                     <td className="px-3 py-2">{row.memberNumber}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span>{row.memberName}</span>
-                        {isOverdue ? (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-700 dark:bg-red-900/60 dark:text-red-200">
-                            Overdue
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
+                    <td className="px-3 py-2">{row.memberName}</td>
                     <td className="px-3 py-2 hidden lg:table-cell">{row.cycle}</td>
                     <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.securityAmount)}</td>
                     <td className="px-3 py-2">{row.loanNumber}</td>
@@ -391,7 +357,7 @@ export function LoanTable({loanType, rows, count}: Props) {
                     </tr>
                   ) : null}
                 </Fragment>
-              )})}
+              ))}
               {rows.length === 0 ? (
                 <tr>
                   <td className="px-3 py-6 text-center text-muted-foreground" colSpan={13}>

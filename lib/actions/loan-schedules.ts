@@ -97,12 +97,31 @@ export async function updateScheduleStatusAction(scheduleId: string, status: str
   const supabase = createClient();
   const {data: existing, error: fetchError} = await supabase
     .from('loan_schedules')
-    .select('loan_id, paid_amount, expected_amount')
+    .select('loan_id, paid_amount, expected_amount, expected_date, week_number, status')
     .eq('id', scheduleId)
     .single();
 
   if (fetchError || !existing) {
     return { error: fetchError?.message || 'Schedule not found' };
+  }
+
+  if (status === 'paid') {
+    const {data: previous, error: prevError} = await supabase
+      .from('loan_schedules')
+      .select('id, status')
+      .eq('loan_id', existing.loan_id)
+      .lt('week_number', existing.week_number)
+      .order('week_number', {ascending: false})
+      .limit(1)
+      .maybeSingle();
+
+    if (prevError) {
+      return {error: prevError.message};
+    }
+
+    if (previous && previous.status !== 'paid') {
+      return {error: 'Please mark the previous installment before this one.'};
+    }
   }
 
   const newPaidAmount = status === 'paid' ? Number(existing.expected_amount ?? 0) : 0;

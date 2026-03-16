@@ -39,6 +39,7 @@ export function GroupLoanForm({groupId, members, onClose}: Props) {
     setError(null);
     formData.append('loanType', 'vikundi_wakinamama' as LoanType);
     formData.append('groupId', groupId);
+    formData.append('repaymentFrequency', 'weekly');
 
     startTransition(async () => {
       const result = await createLoanAction(formData);

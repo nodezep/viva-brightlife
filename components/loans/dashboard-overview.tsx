@@ -1,14 +1,7 @@
 'use client';
 
 import {useMemo} from 'react';
-import {
-  AlertTriangle,
-  Coins,
-  HandCoins,
-  Layers3,
-  Users,
-  Wallet2
-} from 'lucide-react';
+import {Coins, HandCoins, Layers3, Users, Wallet2} from 'lucide-react';
 import {useLocale, useTranslations} from 'next-intl';
 import Link from 'next/link';
 import type {LoanType} from '@/types';
@@ -90,11 +83,6 @@ export function DashboardOverview({metrics, range, month}: Props) {
         label: t('total_collections'),
         value: currency.format(metrics.totalCollections),
         icon: Coins
-      },
-      {
-        label: t('overdue_loans'),
-        value: metrics.overdueLoans.toString(),
-        icon: AlertTriangle
       },
       {label: t('active_members'), value: metrics.activeMembers.toString(), icon: Users},
       {label: t('active_groups'), value: metrics.activeGroups.toString(), icon: Layers3}

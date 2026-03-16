@@ -12,6 +12,7 @@ type LoanRow = {
   weekly_installment: number;
   outstanding_balance: number;
   overdue_amount: number;
+  repayment_frequency?: 'weekly' | 'daily' | null;
   duration_months?: number | null;
   amount_withdrawn?: number | null;
   interest_rate?: number | null;
@@ -67,7 +68,8 @@ async function getOverdueMetricsForLoans(
       return;
     }
     const expectedDateStr = row.expected_date;
-    if (expectedDateStr > todayStr) {
+    // Not overdue if due date is today or in the future
+    if (expectedDateStr >= todayStr) {
       return;
     }
     const [year, month, day] = expectedDateStr.split('-').map(Number);
@@ -104,6 +106,7 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     overdueAmount: Number(row.overdue_amount ?? 0),
     status: row.status,
     loanType: row.loan_type,
+    repaymentFrequency: (row.repayment_frequency ?? 'weekly') as 'weekly' | 'daily',
     durationMonths: Number(row.duration_months ?? 0) || 0,
     amountPaid: Number(row.amount_withdrawn ?? 0),
     interestRate: Number(row.interest_rate ?? 0),
@@ -133,7 +136,7 @@ export async function getLoansByType(
   let dbQuery = supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(member_number,full_name,phone)',
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(member_number,full_name,phone)',
       { count: 'exact' }
     )
     .eq('loan_type', loanType);
@@ -208,7 +211,7 @@ export async function getLoansByType(
     data: records.map((record) => {
       const metrics = overdueMetrics.get(record.id);
       if (!metrics) {
-        return {...record, daysOverdue: record.daysOverdue ?? 0, overdueAmount: record.overdueAmount ?? 0};
+        return {...record, daysOverdue: 0, overdueAmount: 0};
       }
       return {
         ...record,
@@ -225,7 +228,7 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   const {data, error} = await supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
     )
     .order('created_at', {ascending: false});
 
@@ -242,7 +245,7 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   return records.map((record) => {
     const metrics = overdueMetrics.get(record.id);
     if (!metrics) {
-      return {...record, daysOverdue: record.daysOverdue ?? 0, overdueAmount: record.overdueAmount ?? 0};
+      return {...record, daysOverdue: 0, overdueAmount: 0};
     }
     return {
       ...record,
@@ -416,13 +419,6 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
   );
 
   const overdueLoanIds = new Set<string>();
-  (scheduleRows ?? []).forEach((row) => {
-    const expected = Number(row.expected_amount ?? 0);
-    const paid = Number(row.paid_amount ?? 0);
-    if (row.expected_date < today && paid < expected) {
-      overdueLoanIds.add(row.loan_id);
-    }
-  });
 
   const scheduleTotalsByType = (scheduleRows ?? []).reduce(
     (acc, row) => {
@@ -678,7 +674,7 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   const {data, error} = await supabase
     .from('loans')
     .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
+      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
     )
     .eq('group_id', groupId)
     .order('created_at', {ascending: false});
@@ -696,7 +692,7 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   return records.map((record) => {
     const metrics = overdueMetrics.get(record.id);
     if (!metrics) {
-      return {...record, daysOverdue: record.daysOverdue ?? 0, overdueAmount: record.overdueAmount ?? 0};
+      return {...record, daysOverdue: 0, overdueAmount: 0};
     }
     return {
       ...record,
