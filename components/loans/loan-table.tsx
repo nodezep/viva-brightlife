@@ -183,7 +183,123 @@ export function LoanTable({loanType, rows, count}: Props) {
       ) : null}
       <div className="overflow-x-auto rounded-xl border bg-card relative">
         {isIndividual ? (
-          <table className="min-w-[1600px] w-full text-sm">
+          <>
+            <div className="md:hidden space-y-3 p-3">
+              {rows.map((row, index) => {
+                const returnDate = addMonthsToIso(row.disbursementDate, row.cycle);
+                const ratePercent =
+                  row.interestRate && row.interestRate > 0
+                    ? row.interestRate
+                    : row.disbursementAmount > 0
+                      ? (row.securityAmount / row.disbursementAmount) * 100
+                      : 0;
+                const rateDecimal =
+                  ratePercent <= 1 ? ratePercent : ratePercent / 100;
+                return (
+                  <div key={row.id} className="rounded-xl border bg-card p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{t('table.sno')} {index + 1}</p>
+                        <p className="text-sm font-semibold">{row.memberName}</p>
+                        <p className="text-xs text-muted-foreground">{row.memberNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">{t('table.loan_amount')}</p>
+                        <p className="text-sm font-semibold">{currency.format(row.disbursementAmount)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">{t('table.disbursement_date')}</p>
+                        <p className="font-medium">{row.disbursementDate}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">{t('table.return_date')}</p>
+                        <p className="font-medium">{returnDate}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">{t('table.total_repay')}</p>
+                        <p className="font-medium">{currency.format(row.installmentSize)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">{t('table.balance')}</p>
+                        <p className="font-medium">{currency.format(row.outstandingBalance)}</p>
+                      </div>
+                    </div>
+
+                    <details className="mt-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+                      <summary className="cursor-pointer font-semibold text-muted-foreground">
+                        More details
+                      </summary>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-muted-foreground">{t('table.days_overdue')}</p>
+                          <p className="font-medium">{row.daysOverdue ?? 0}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">{t('table.interest_rate')}</p>
+                          <p className="font-medium">{rateDecimal}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">{t('table.interest_amount')}</p>
+                          <p className="font-medium">{currency.format(row.securityAmount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">{t('table.loan_duration_months')}</p>
+                          <p className="font-medium">{row.cycle}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">{t('table.amount_paid')}</p>
+                          <p className="font-medium">{currency.format(row.amountPaid ?? 0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">{t('table.phone_number')}</p>
+                          <p className="font-medium">{row.memberPhone ?? '-'}</p>
+                        </div>
+                      </div>
+                    </details>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                        onClick={() => setSelectedLoanId(row.id)}
+                      >
+                        <CalendarDays size={12} /> Marejesho
+                      </button>
+                      <button
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                        onClick={() =>
+                          setEditingLoanId(editingLoanId === row.id ? null : row.id)
+                        }
+                      >
+                        {t('buttons.edit')}
+                      </button>
+                      <button
+                        className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => handleDelete(row)}
+                        disabled={profile?.role && profile.role !== 'admin'}
+                      >
+                        <Trash2 size={12} /> {t('buttons.delete')}
+                      </button>
+                    </div>
+
+                    {editingLoanId === row.id ? (
+                      <div className="mt-3 rounded-lg border bg-muted/20 p-3">
+                        <LoanEditForm loan={row} onClose={() => setEditingLoanId(null)} />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {rows.length === 0 ? (
+                <div className="rounded-lg border px-3 py-6 text-center text-muted-foreground">
+                  No records found.
+                </div>
+              ) : null}
+            </div>
+
+            <table className="min-w-[1600px] w-full text-sm hidden md:table">
             <thead className="bg-muted/70 text-left">
               <tr>
                 <th className="px-3 py-2">{t('table.sno')}</th>
@@ -280,8 +396,98 @@ export function LoanTable({loanType, rows, count}: Props) {
               ) : null}
             </tbody>
           </table>
+          </>
         ) : (
-          <table className="min-w-[1300px] w-full text-sm">
+          <>
+            <div className="md:hidden space-y-3 p-3">
+              {rows.map((row) => (
+                <div key={row.id} className="rounded-xl border bg-card p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{row.memberNumber}</p>
+                      <p className="text-sm font-semibold">{row.memberName}</p>
+                      <p className="text-xs text-muted-foreground">{row.loanNumber}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">{t('table.os_balance')}</p>
+                      <p className="text-sm font-semibold">{currency.format(row.outstandingBalance)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-muted-foreground">{t('table.disbursement_amount')}</p>
+                      <p className="font-medium">{currency.format(row.disbursementAmount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">{t('table.disbursement_date')}</p>
+                      <p className="font-medium">{row.disbursementDate}</p>
+                    </div>
+                  </div>
+
+                  <details className="mt-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+                    <summary className="cursor-pointer font-semibold text-muted-foreground">
+                      More details
+                    </summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-muted-foreground">{t('table.cycle')}</p>
+                        <p className="font-medium">{row.cycle}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">{t('table.security_amount')}</p>
+                        <p className="font-medium">{currency.format(row.securityAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">{t('table.installment_size')}</p>
+                        <p className="font-medium">{currency.format(row.installmentSize)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">{t('table.status')}</p>
+                        <p className="font-medium capitalize">{row.status}</p>
+                      </div>
+                    </div>
+                  </details>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                      onClick={() => setSelectedLoanId(row.id)}
+                    >
+                      <CalendarDays size={12} /> Marejesho
+                    </button>
+                    <button
+                      className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                      onClick={() =>
+                        setEditingLoanId(editingLoanId === row.id ? null : row.id)
+                      }
+                    >
+                      {t('buttons.edit')}
+                    </button>
+                    <button
+                      className="inline-flex items-center gap-1 rounded-md border text-red-600 border-red-200 px-2 py-1 text-xs hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => handleDelete(row)}
+                      disabled={profile?.role && profile.role !== 'admin'}
+                    >
+                      <Trash2 size={12} /> {t('buttons.delete')}
+                    </button>
+                  </div>
+
+                  {editingLoanId === row.id ? (
+                    <div className="mt-3 rounded-lg border bg-muted/20 p-3">
+                      <LoanEditForm loan={row} onClose={() => setEditingLoanId(null)} />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              {rows.length === 0 ? (
+                <div className="rounded-lg border px-3 py-6 text-center text-muted-foreground">
+                  No records found.
+                </div>
+              ) : null}
+            </div>
+
+            <table className="min-w-[1300px] w-full text-sm hidden md:table">
             <thead className="bg-muted/70 text-left">
               <tr>
                 <th className="px-3 py-2">{t('table.number')}</th>
@@ -367,6 +573,7 @@ export function LoanTable({loanType, rows, count}: Props) {
               ) : null}
             </tbody>
           </table>
+          </>
         )}
       </div>
 

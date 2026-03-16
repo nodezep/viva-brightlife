@@ -3,6 +3,7 @@
 import {useEffect, useState} from 'react';
 import {Header} from './header';
 import {Sidebar} from './sidebar';
+import {MobileNav} from './mobile-nav';
 
 type Props = {
   children: React.ReactNode;
@@ -38,12 +39,13 @@ export function AdminShell({children, adminEmail}: Props) {
       />
       <Sidebar open={open} collapsed={collapsed} onClose={() => setOpen(false)} />
       <main
-        className={`print-area px-4 pb-8 pt-20 lg:px-6 ${
+        className={`print-area px-3 pb-24 pt-20 sm:px-4 lg:px-6 lg:pb-8 ${
           collapsed ? 'lg:ml-16' : 'lg:ml-72'
         }`}
       >
         {children}
       </main>
+      <MobileNav />
     </div>
   );
 }

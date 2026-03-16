@@ -373,7 +373,7 @@ export function LoanEditForm({loan, onClose}: Props) {
         </p>
       ) : null}
       
-      <div className="md:col-span-3 flex gap-2">
+      <div className="md:col-span-3 flex gap-2 sticky bottom-0 z-10 -mx-4 border-t bg-card/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <button
           type="submit"
           disabled={isPending}
