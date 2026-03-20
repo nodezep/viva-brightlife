@@ -55,8 +55,17 @@ body {
 }
 
 @media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
   .no-print {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
   }
 
   .print-area {
@@ -66,4 +75,57 @@ body {
     color: #000;
     background: #fff;
   }
+}
+
+.print-only {
+  display: none;
+}
+
+@keyframes reportFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reportFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.report-fade-up {
+  animation: reportFadeUp 600ms ease-out both;
+}
+
+.report-stagger > * {
+  animation: reportFadeUp 600ms ease-out both;
+}
+
+.report-stagger > *:nth-child(1) {
+  animation-delay: 40ms;
+}
+
+.report-stagger > *:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.report-stagger > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+.report-stagger > *:nth-child(4) {
+  animation-delay: 160ms;
+}
+
+.report-float {
+  animation: reportFloat 6s ease-in-out infinite;
 }

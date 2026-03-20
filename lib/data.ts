@@ -36,6 +36,39 @@ type OverdueMetrics = {
   overdueAmount: number;
 };
 
+function getTodayIsoLocal(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addMonthsToIso(isoDate: string, months: number): string | null {
+  const base = new Date(isoDate);
+  if (Number.isNaN(base.getTime()) || months <= 0) {
+    return null;
+  }
+  const d = new Date(base);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() < day) {
+    d.setDate(0);
+  }
+  return d.toISOString().split('T')[0];
+}
+
+function diffDays(isoFrom: string, isoTo: string): number {
+  const [fromYear, fromMonth, fromDay] = isoFrom.split('-').map(Number);
+  const [toYear, toMonth, toDay] = isoTo.split('-').map(Number);
+  if (!fromYear || !fromMonth || !fromDay || !toYear || !toMonth || !toDay) {
+    return 0;
+  }
+  const fromUtc = Date.UTC(fromYear, fromMonth - 1, fromDay);
+  const toUtc = Date.UTC(toYear, toMonth - 1, toDay);
+  return Math.floor((fromUtc - toUtc) / 86400000);
+}
+
 async function getOverdueMetricsForLoans(
   supabase: ReturnType<typeof createClient>,
   loanIds: string[]
@@ -54,9 +87,7 @@ async function getOverdueMetricsForLoans(
     return metrics;
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const [todayYear, todayMonth, todayDay] = todayStr.split('-').map(Number);
-  const todayUtc = Date.UTC(todayYear, (todayMonth ?? 1) - 1, todayDay ?? 1);
+  const todayStr = getTodayIsoLocal();
 
   data.forEach((row) => {
     if (!row.expected_date) {
@@ -77,6 +108,11 @@ async function getOverdueMetricsForLoans(
       return;
     }
     const expectedUtc = Date.UTC(year, month - 1, day);
+    const todayUtc = Date.UTC(
+      Number(todayStr.slice(0, 4)),
+      Number(todayStr.slice(5, 7)) - 1,
+      Number(todayStr.slice(8, 10))
+    );
     const overdueDays = Math.max(0, Math.floor((todayUtc - expectedUtc) / 86400000));
 
     const current = metrics.get(row.loan_id) ?? {daysOverdue: 0, overdueAmount: 0};
@@ -209,6 +245,26 @@ export async function getLoansByType(
 
   return {
     data: records.map((record) => {
+      if (record.outstandingBalance <= 0) {
+        return {...record, daysOverdue: 0, overdueAmount: 0};
+      }
+      if (record.loanType === 'binafsi') {
+        const durationMonths =
+          record.durationMonths && record.durationMonths > 0
+            ? record.durationMonths
+            : record.cycle;
+        const returnDate = addMonthsToIso(record.disbursementDate, durationMonths);
+        if (!returnDate) {
+          return {...record, daysOverdue: 0, overdueAmount: 0};
+        }
+        const todayStr = getTodayIsoLocal();
+        const daysOverdue = Math.max(0, diffDays(todayStr, returnDate));
+        return {
+          ...record,
+          daysOverdue,
+          overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0
+        };
+      }
       const metrics = overdueMetrics.get(record.id);
       if (!metrics) {
         return {...record, daysOverdue: 0, overdueAmount: 0};
@@ -243,6 +299,26 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   );
 
   return records.map((record) => {
+    if (record.outstandingBalance <= 0) {
+      return {...record, daysOverdue: 0, overdueAmount: 0};
+    }
+    if (record.loanType === 'binafsi') {
+      const durationMonths =
+        record.durationMonths && record.durationMonths > 0
+          ? record.durationMonths
+          : record.cycle;
+      const returnDate = addMonthsToIso(record.disbursementDate, durationMonths);
+      if (!returnDate) {
+        return {...record, daysOverdue: 0, overdueAmount: 0};
+      }
+      const todayStr = getTodayIsoLocal();
+      const daysOverdue = Math.max(0, diffDays(todayStr, returnDate));
+      return {
+        ...record,
+        daysOverdue,
+        overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0
+      };
+    }
     const metrics = overdueMetrics.get(record.id);
     if (!metrics) {
       return {...record, daysOverdue: 0, overdueAmount: 0};
@@ -690,6 +766,26 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   );
 
   return records.map((record) => {
+    if (record.outstandingBalance <= 0) {
+      return {...record, daysOverdue: 0, overdueAmount: 0};
+    }
+    if (record.loanType === 'binafsi') {
+      const durationMonths =
+        record.durationMonths && record.durationMonths > 0
+          ? record.durationMonths
+          : record.cycle;
+      const returnDate = addMonthsToIso(record.disbursementDate, durationMonths);
+      if (!returnDate) {
+        return {...record, daysOverdue: 0, overdueAmount: 0};
+      }
+      const todayStr = getTodayIsoLocal();
+      const daysOverdue = Math.max(0, diffDays(todayStr, returnDate));
+      return {
+        ...record,
+        daysOverdue,
+        overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0
+      };
+    }
     const metrics = overdueMetrics.get(record.id);
     if (!metrics) {
       return {...record, daysOverdue: 0, overdueAmount: 0};

@@ -109,7 +109,13 @@ async function sendWithAfricasTalking(
   let payload:
     | {
         SMSMessageData?: {
-          Recipients?: Array<{messageId?: string; status?: string; statusCode?: number}>;
+          Recipients?: Array<{
+            messageId?: string;
+            status?: string;
+            statusCode?: number;
+            number?: string;
+            cost?: string;
+          }>;
         };
         errorMessage?: string;
       }
@@ -131,8 +137,20 @@ async function sendWithAfricasTalking(
     };
   }
 
-  const messageId = payload?.SMSMessageData?.Recipients?.[0]?.messageId;
-  return {ok: true, providerMessageId: messageId};
+  const recipient = payload?.SMSMessageData?.Recipients?.[0];
+  if (!recipient) {
+    return {ok: false, error: 'Africaâ€™s Talking response missing recipient data'};
+  }
+
+  if (recipient.status && recipient.status.toLowerCase() !== 'success') {
+    const statusCode = recipient.statusCode ?? 'unknown';
+    return {
+      ok: false,
+      error: `Africaâ€™s Talking status: ${recipient.status} (code ${statusCode})`
+    };
+  }
+
+  return {ok: true, providerMessageId: recipient.messageId};
 }
 
 export async function sendSms(phone: string, message: string): Promise<SmsProviderResult> {

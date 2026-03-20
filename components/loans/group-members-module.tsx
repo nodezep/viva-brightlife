@@ -40,6 +40,10 @@ export function GroupMembersModule({group, loans}: Props) {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${now.getFullYear()}-${month}`;
   });
+  const [printDates, setPrintDates] = useState<string[]>([]);
+  const [selectedPrintDates, setSelectedPrintDates] = useState<string[]>([]);
+  const [printLoading, setPrintLoading] = useState(false);
+  const [printMonth, setPrintMonth] = useState('');
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -204,6 +208,17 @@ export function GroupMembersModule({group, loans}: Props) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(value);
 
+  const formatDateLabel = (value: string) => {
+    if (!value || value.startsWith('Week')) {
+      return value;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit'});
+  };
+
   const buildScheduleColumns = (schedulesByLoan: Map<string, any[]>) => {
     const [year, month] = exportMonth.split('-').map(Number);
     if (!year || !month) {
@@ -227,6 +242,65 @@ export function GroupMembersModule({group, loans}: Props) {
       sorted.push(`Week ${sorted.length + 1}`);
     }
     return sorted;
+  };
+
+  const buildPrintDates = (
+    schedulesByLoan: Map<string, any[]>,
+    monthValue: string
+  ) => {
+    const [year, month] = monthValue.split('-').map(Number);
+    if (!year || !month) {
+      return [];
+    }
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    const dates = new Set<string>();
+    schedulesByLoan.forEach((schedules) => {
+      schedules.forEach((schedule) => {
+        const date = schedule.expected_date;
+        if (!date) return;
+        const d = new Date(date);
+        if (d >= start && d <= end) {
+          dates.add(date);
+        }
+      });
+    });
+    const sorted = Array.from(dates).sort();
+    if (sorted.length > 0) {
+      return sorted;
+    }
+    const fallback = [];
+    for (let i = 0; i < 4; i += 1) {
+      const d = new Date(year, month - 1, 1 + i * 7);
+      fallback.push(d.toISOString().split('T')[0]);
+    }
+    return fallback;
+  };
+
+  const loadPrintData = async (monthValue: string, force = false) => {
+    if (printLoading) {
+      return;
+    }
+    if (!force && printMonth === monthValue && printDates.length > 0) {
+      return;
+    }
+    setPrintLoading(true);
+    const schedules: Array<[string, any[]]> = await Promise.all(
+      loans.map(async (loan) => {
+        try {
+          const data = await getLoanSchedulesAction(loan.id);
+          return [loan.id, (data ?? []) as any[]];
+        } catch {
+          return [loan.id, []];
+        }
+      })
+    );
+    const scheduleMap = new Map(schedules);
+    const dates = buildPrintDates(scheduleMap, monthValue);
+    setPrintDates(dates);
+    setSelectedPrintDates([]);
+    setPrintMonth(monthValue);
+    setPrintLoading(false);
   };
 
   const exportGroupLoans = async () => {
@@ -577,12 +651,32 @@ export function GroupMembersModule({group, loans}: Props) {
                 type="month"
                 className="rounded-lg border bg-background px-3 py-2 text-sm"
                 value={exportMonth}
-                onChange={(e) => setExportMonth(e.target.value)}
+                onChange={(e) => {
+                  setExportMonth(e.target.value);
+                  setPrintDates([]);
+                  setSelectedPrintDates([]);
+                  setPrintMonth('');
+                }}
               />
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                onClick={() => window.print()}
+                onClick={() => void loadPrintData(exportMonth, true)}
+                disabled={printLoading}
+              >
+                {printLoading ? 'Loading dates...' : 'Load Dates'}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                onClick={async () => {
+                  if (printDates.length === 0 || printMonth !== exportMonth) {
+                    await loadPrintData(exportMonth, true);
+                    return;
+                  }
+                  setTimeout(() => window.print(), 120);
+                }}
+                disabled={selectedPrintDates.length === 0}
               >
                 <Printer size={16} /> Print
               </button>
@@ -595,7 +689,128 @@ export function GroupMembersModule({group, loans}: Props) {
               </button>
             </div>
           </div>
-          <LoanTable loanType="vikundi_wakinamama" rows={loans} count={loans.length} />
+          <div className="no-print rounded-xl border bg-card p-3">
+            <p className="text-sm font-medium text-foreground">Select dates to print</p>
+            <p className="text-xs text-muted-foreground">
+              Click "Load Dates" after choosing the month, then select the dates.
+            </p>
+            {printDates.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                  onClick={() => setSelectedPrintDates(printDates)}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                  onClick={() => setSelectedPrintDates([])}
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {printDates.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  No dates loaded yet.
+                </span>
+              ) : (
+                printDates.map((date) => {
+                  const checked = selectedPrintDates.includes(date);
+                  return (
+                    <label
+                      key={date}
+                      className="inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setSelectedPrintDates((current) =>
+                            e.target.checked
+                              ? [...current, date]
+                              : current.filter((item) => item !== date)
+                          );
+                        }}
+                      />
+                      {formatDateLabel(date)}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+          <div className="print-only space-y-3">
+            <div className="rounded-xl border bg-card p-3">
+              <div className="text-sm font-semibold">
+                Viva Brightlife Microfinance - {group.groupName}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Group Number: {group.groupNumber} | Month: {exportMonth}
+              </div>
+            </div>
+            <div className="rounded-xl border bg-card overflow-x-auto">
+              <table className="min-w-[1200px] w-full text-xs">
+                <thead className="bg-muted/70 text-left">
+                  <tr>
+                    <th className="px-3 py-2">Member</th>
+                    <th className="px-3 py-2">Loan Number</th>
+                    <th className="px-3 py-2">Loan Amount</th>
+                    <th className="px-3 py-2">Installment</th>
+                    <th className="px-3 py-2">OS Balance</th>
+                    {(selectedPrintDates.length > 0
+                      ? selectedPrintDates
+                      : printDates
+                    ).map((date) => (
+                      <th key={date} className="px-3 py-2">
+                        {formatDateLabel(date)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loans.map((loan) => (
+                    <tr key={loan.id} className="border-t">
+                      <td className="px-3 py-2">{loan.memberName}</td>
+                      <td className="px-3 py-2">{loan.loanNumber}</td>
+                      <td className="px-3 py-2">{formatCurrency(loan.disbursementAmount)}</td>
+                      <td className="px-3 py-2">{formatCurrency(loan.installmentSize)}</td>
+                      <td className="px-3 py-2">{formatCurrency(loan.outstandingBalance)}</td>
+                      {(selectedPrintDates.length > 0
+                        ? selectedPrintDates
+                        : printDates
+                      ).map((date) => (
+                        <td key={`${loan.id}-${date}`} className="px-3 py-2">
+                          {'\u00A0'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {loans.length === 0 ? (
+                    <tr>
+                      <td
+                        className="px-3 py-6 text-center text-muted-foreground"
+                        colSpan={
+                          5 +
+                          (selectedPrintDates.length > 0
+                            ? selectedPrintDates.length
+                            : printDates.length)
+                        }
+                      >
+                        No records found.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="no-print">
+            <LoanTable loanType="vikundi_wakinamama" rows={loans} count={loans.length} />
+          </div>
         </>
       )}
     </section>
