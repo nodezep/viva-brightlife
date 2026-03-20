@@ -28,6 +28,7 @@ export function LoanEditForm({loan, onClose}: Props) {
   const [principal, setPrincipal] = useState(String(loan.disbursementAmount ?? ''));
   const [principalDisplay, setPrincipalDisplay] = useState('');
   const [disbursementDate, setDisbursementDate] = useState(loan.disbursementDate ?? '');
+  const [returnStartDate, setReturnStartDate] = useState(loan.returnStartDate ?? '');
   const [durationMonths, setDurationMonths] = useState(
     loan.durationMonths ? String(loan.durationMonths) : ''
   );
@@ -276,6 +277,14 @@ export function LoanEditForm({loan, onClose}: Props) {
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         name="disbursementDate"
         defaultValue={loan.disbursementDate}
+      />
+      <input
+        type="date"
+        className="rounded-lg border bg-background px-3 py-2 text-sm"
+        name="returnStartDate"
+        value={returnStartDate}
+        onChange={(e) => setReturnStartDate(e.target.value)}
+        placeholder="Return Start Date (optional)"
       />
       <input
         type="text"

@@ -17,6 +17,7 @@ type LoanRow = {
   amount_withdrawn?: number | null;
   interest_rate?: number | null;
   days_overdue?: number | null;
+  return_start_date?: string | null;
   status: 'active' | 'closed' | 'defaulted' | 'pending';
   members:
     | {member_number: string; full_name: string; phone: string | null}
@@ -146,9 +147,20 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     durationMonths: Number(row.duration_months ?? 0) || 0,
     amountPaid: Number(row.amount_withdrawn ?? 0),
     interestRate: Number(row.interest_rate ?? 0),
-    daysOverdue: Number(row.days_overdue ?? 0)
+    daysOverdue: Number(row.days_overdue ?? 0),
+    returnStartDate: row.return_start_date ?? null
   };
 }
+
+const loanSelectFields = (includeReturnStart: boolean) =>
+  includeReturnStart
+    ? 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,return_start_date,status,members!inner(member_number,full_name,phone)'
+    : 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(member_number,full_name,phone)';
+
+const loanSelectFieldsOuter = (includeReturnStart: boolean) =>
+  includeReturnStart
+    ? 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,return_start_date,status,members(member_number,full_name,phone)'
+    : 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)';
 
 export type LoanSort =
   | 'newest'
@@ -169,13 +181,13 @@ export async function getLoansByType(
   const supabase = createClient();
   const PAGE_SIZE = 50;
 
-  let dbQuery = supabase
-    .from('loans')
-    .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(member_number,full_name,phone)',
-      { count: 'exact' }
-    )
-    .eq('loan_type', loanType);
+  const buildQuery = (includeReturnStart: boolean) =>
+    supabase
+      .from('loans')
+      .select(loanSelectFields(includeReturnStart), {count: 'exact'})
+      .eq('loan_type', loanType);
+
+  let dbQuery = buildQuery(true);
 
   if (query) {
     // Only search members full name for safety, or check if query is numbers
@@ -231,7 +243,12 @@ export async function getLoansByType(
       break;
   }
 
-  const { data, count, error } = await dbQuery.range(from, to);
+  let {data, count, error} = await dbQuery.range(from, to);
+
+  if (error && error.message?.includes('return_start_date')) {
+    dbQuery = buildQuery(false);
+    ({data, count, error} = await dbQuery.range(from, to));
+  }
 
   if (error || !data) {
     return { data: [], count: 0 };
@@ -281,12 +298,17 @@ export async function getLoansByType(
 
 export async function getAllLoans(): Promise<LoanRecord[]> {
   const supabase = createClient();
-  const {data, error} = await supabase
+  let {data, error} = await supabase
     .from('loans')
-    .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
-    )
+    .select(loanSelectFieldsOuter(true))
     .order('created_at', {ascending: false});
+
+  if (error && error.message?.includes('return_start_date')) {
+    ({data, error} = await supabase
+      .from('loans')
+      .select(loanSelectFieldsOuter(false))
+      .order('created_at', {ascending: false}));
+  }
 
   if (error || !data) {
     return [];
@@ -747,13 +769,19 @@ export async function getMembersForGroupSelection(): Promise<MemberOption[]> {
 
 export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   const supabase = createClient();
-  const {data, error} = await supabase
+  let {data, error} = await supabase
     .from('loans')
-    .select(
-      'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)'
-    )
+    .select(loanSelectFieldsOuter(true))
     .eq('group_id', groupId)
     .order('created_at', {ascending: false});
+
+  if (error && error.message?.includes('return_start_date')) {
+    ({data, error} = await supabase
+      .from('loans')
+      .select(loanSelectFieldsOuter(false))
+      .eq('group_id', groupId)
+      .order('created_at', {ascending: false}));
+  }
 
   if (error || !data) {
     return [];

@@ -30,6 +30,7 @@ export type LoanRecord = {
   memberPhone?: string | null;
   interestRate?: number;
   daysOverdue?: number;
+  returnStartDate?: string | null;
 };
 
 export type NavItem = {

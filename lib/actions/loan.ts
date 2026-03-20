@@ -3,6 +3,20 @@
 import {createClient} from '@/lib/supabase/server';
 import {revalidatePath} from 'next/cache';
 
+const addDaysToIso = (isoDate: string, days: number) => {
+  const base = new Date(isoDate);
+  if (Number.isNaN(base.getTime())) {
+    return null;
+  }
+  base.setDate(base.getDate() + days);
+  return base.toISOString().split('T')[0];
+};
+
+const getDefaultReturnStartDate = (
+  disbursementDate: string,
+  repaymentFrequency: string
+) => addDaysToIso(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
+
 export async function createLoanAction(formData: FormData) {
   const supabase = createClient();
   
@@ -24,6 +38,7 @@ export async function createLoanAction(formData: FormData) {
   const memberPhone = formData.get('memberPhone') as string | null;
   const daysOverdue = Number(formData.get('daysOverdue') || 0);
   const repaymentFrequency = (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
+  const returnStartDateRaw = (formData.get('returnStartDate') as string | null) ?? '';
   const durationWeeksRaw = formData.get('durationWeeks');
   const durationWeeks =
     durationWeeksRaw === null || durationWeeksRaw === ''
@@ -139,6 +154,14 @@ export async function createLoanAction(formData: FormData) {
     insertPayload.days_overdue = daysOverdue;
   } else {
     insertPayload.repayment_frequency = repaymentFrequency;
+    const defaultReturnStart = getDefaultReturnStartDate(
+      disbursementDate,
+      repaymentFrequency
+    );
+    insertPayload.return_start_date =
+      returnStartDateRaw && returnStartDateRaw.trim()
+        ? returnStartDateRaw
+        : defaultReturnStart;
   }
 
   const {data, error} = await supabase.from('loans').insert(insertPayload).select('id').single();
@@ -153,26 +176,21 @@ export async function createLoanAction(formData: FormData) {
   if (loanType !== 'binafsi' && durationWeeks > 0) {
     const schedules = [];
     let remainingAmount = outstandingBalance;
-    let currentDate = new Date(disbursementDate);
+    const defaultReturnStart = getDefaultReturnStartDate(
+      disbursementDate,
+      repaymentFrequency
+    );
+    const startDate =
+      returnStartDateRaw && returnStartDateRaw.trim()
+        ? returnStartDateRaw
+        : defaultReturnStart || disbursementDate;
+    let currentDate = new Date(startDate);
     const isDaily = repaymentFrequency === 'daily';
 
-    const addMonths = (date: Date, months: number) => {
-      const d = new Date(date);
-      const day = d.getDate();
-      d.setMonth(d.getMonth() + months);
-      if (d.getDate() < day) {
-        d.setDate(0);
-      }
-      return d;
-    };
-
-    if (!isDaily) {
-      // One-month grace period before first weekly payment
-      currentDate = addMonths(currentDate, 1);
-    }
-
     for (let i = 1; i <= durationWeeks; i++) {
-      currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
+      if (i > 1) {
+        currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
+      }
       
       const isLastWeek = i === durationWeeks;
       // If it's the last week, pay all remaining. Otherwise math.min
@@ -272,6 +290,7 @@ export async function updateLoanAction(formData: FormData) {
   const memberPhone = formData.get('memberPhone') as string | null;
   const daysOverdue = Number(formData.get('daysOverdue') || 0);
   const repaymentFrequency = (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
+  const returnStartDateRaw = (formData.get('returnStartDate') as string | null) ?? '';
   const durationWeeksRaw = formData.get('durationWeeks');
   const durationWeeks =
     durationWeeksRaw === null || durationWeeksRaw === ''
@@ -336,6 +355,14 @@ export async function updateLoanAction(formData: FormData) {
     updatePayload.days_overdue = daysOverdue;
   } else {
     updatePayload.repayment_frequency = repaymentFrequency;
+    const defaultReturnStart = getDefaultReturnStartDate(
+      disbursementDate,
+      repaymentFrequency
+    );
+    updatePayload.return_start_date =
+      returnStartDateRaw && returnStartDateRaw.trim()
+        ? returnStartDateRaw
+        : defaultReturnStart;
   }
 
   const {error: updateError} = await supabase.from('loans').update(updatePayload).eq('id', loanId);
@@ -344,7 +371,9 @@ export async function updateLoanAction(formData: FormData) {
     return {error: updateError.message};
   }
 
-  if (loanType !== 'binafsi' && durationWeeks > 0) {
+  const durationWeeksValue = durationWeeks > 0 ? durationWeeks : cycleCount;
+
+  if (loanType !== 'binafsi' && durationWeeksValue > 0) {
     const {error: deleteError} = await supabase
       .from('loan_schedules')
       .delete()
@@ -356,27 +385,22 @@ export async function updateLoanAction(formData: FormData) {
 
     const schedules = [];
     let remainingAmount = outstandingBalance;
-    let currentDate = new Date(disbursementDate);
+    const defaultReturnStart = getDefaultReturnStartDate(
+      disbursementDate,
+      repaymentFrequency
+    );
+    const startDate =
+      returnStartDateRaw && returnStartDateRaw.trim()
+        ? returnStartDateRaw
+        : defaultReturnStart || disbursementDate;
+    let currentDate = new Date(startDate);
     const isDaily = repaymentFrequency === 'daily';
 
-    const addMonths = (date: Date, months: number) => {
-      const d = new Date(date);
-      const day = d.getDate();
-      d.setMonth(d.getMonth() + months);
-      if (d.getDate() < day) {
-        d.setDate(0);
+    for (let i = 1; i <= durationWeeksValue; i++) {
+      if (i > 1) {
+        currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
       }
-      return d;
-    };
-
-    if (!isDaily) {
-      // One-month grace period before first weekly payment
-      currentDate = addMonths(currentDate, 1);
-    }
-
-    for (let i = 1; i <= durationWeeks; i++) {
-      currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
-      const isLastWeek = i === durationWeeks;
+      const isLastWeek = i === durationWeeksValue;
       let expectedAmount = isLastWeek
         ? remainingAmount
         : Math.min(installmentSize, remainingAmount);

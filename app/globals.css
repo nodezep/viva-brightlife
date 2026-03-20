@@ -87,6 +87,25 @@ body {
     padding: 4px !important;
     font-size: 10px !important;
     white-space: nowrap;
+    border-color: #475569 !important;
+  }
+
+  .print-fit tr {
+    border-color: #475569 !important;
+  }
+
+  .print-fit tbody tr:nth-child(even) {
+    background-color: #d9e8ff !important;
+  }
+
+  .print-pdf .print-header {
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+  }
+
+  .print-pdf .print-table {
+    margin-top: 2px !important;
+    border-radius: 8px !important;
   }
 
   .print-area {

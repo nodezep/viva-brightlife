@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useMemo, useState} from 'react';
 import {ArrowLeft, Download, Plus, Printer, Trash2} from 'lucide-react';
 import {useRouter} from '@/lib/navigation';
 import type {GroupDetail, GroupMemberDetail} from '@/lib/data';
@@ -9,7 +9,6 @@ import {LoanTable} from './loan-table';
 import {GroupLoanFormDialog} from './group-loan-form-dialog';
 import {getLoanSchedulesAction} from '@/lib/actions/loan-schedules';
 import {useProfile} from '@/lib/hooks/use-profile';
-import ExcelJS from 'exceljs';
 
 type Props = {
   group: GroupDetail;
@@ -40,16 +39,11 @@ export function GroupMembersModule({group, loans}: Props) {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     return `${now.getFullYear()}-${month}`;
   });
-  const [printDates, setPrintDates] = useState<string[]>([]);
-  const [selectedPrintDates, setSelectedPrintDates] = useState<string[]>([]);
   const [printSchedules, setPrintSchedules] = useState<Map<string, Map<string, any>>>(
     new Map()
   );
   const [printLoading, setPrintLoading] = useState(false);
   const [printMonth, setPrintMonth] = useState('');
-  const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customWeeks, setCustomWeeks] = useState(4);
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -217,22 +211,47 @@ export function GroupMembersModule({group, loans}: Props) {
   const formatNumber = (value: number) =>
     new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(value);
 
+  const addDaysToIso = (isoDate: string, days: number) => {
+    const base = new Date(isoDate);
+    if (Number.isNaN(base.getTime())) {
+      return '';
+    }
+    base.setDate(base.getDate() + days);
+    return base.toISOString().split('T')[0];
+  };
+
+  const getLoanStartDate = (loan: LoanRecord) =>
+    loan.returnStartDate ??
+    addDaysToIso(
+      loan.disbursementDate,
+      loan.repaymentFrequency === 'daily' ? 1 : 7
+    );
+
   const getExpectedAmount = (
     loan: LoanRecord,
     date: string,
     schedulesMap: Map<string, Map<string, any>>
   ) => {
+    const loanStartDate = getLoanStartDate(loan);
+    if (loanStartDate && date < loanStartDate) {
+      return '-';
+    }
     const schedule = schedulesMap.get(loan.id)?.get(date);
     const expected =
       schedule?.expected_amount ?? schedule?.expectedAmount ?? loan.installmentSize;
     return expected ? formatNumber(Number(expected)) : '';
   };
 
+
   const getExpectedAmountValue = (
     loan: LoanRecord,
     date: string,
     schedulesMap: Map<string, Map<string, any>>
   ) => {
+    const loanStartDate = getLoanStartDate(loan);
+    if (loanStartDate && date < loanStartDate) {
+      return 0;
+    }
     const schedule = schedulesMap.get(loan.id)?.get(date);
     const expected =
       schedule?.expected_amount ?? schedule?.expectedAmount ?? loan.installmentSize;
@@ -251,85 +270,66 @@ export function GroupMembersModule({group, loans}: Props) {
     return date.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit'});
   };
 
-  const buildScheduleColumns = (schedulesByLoan: Map<string, any[]>) => {
-    const [year, month] = exportMonth.split('-').map(Number);
-    if (!year || !month) {
-      return [];
-    }
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0);
-    const dates = new Set<string>();
-    schedulesByLoan.forEach((schedules) => {
-      schedules.forEach((schedule) => {
-        const date = schedule.expected_date;
-        if (!date) return;
-        const d = new Date(date);
-        if (d >= start && d <= end) {
-          dates.add(date);
-        }
-      });
-    });
-    const sorted = Array.from(dates).sort().slice(0, 4);
-    while (sorted.length < 4) {
-      sorted.push(`Week ${sorted.length + 1}`);
-    }
-    return sorted;
-  };
-
-  const buildPrintDates = (
-    schedulesByLoan: Map<string, any[]>,
-    monthValue: string
-  ) => {
+  const buildMonthlyWeeklyDates = (monthValue: string, startDateValue: string) => {
     const [year, month] = monthValue.split('-').map(Number);
-    if (!year || !month) {
+    if (!year || !month || !startDateValue) {
       return [];
     }
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0);
-    const dates = new Set<string>();
-    schedulesByLoan.forEach((schedules) => {
-      schedules.forEach((schedule) => {
-        const date = schedule.expected_date;
-        if (!date) return;
-        const d = new Date(date);
-        if (d >= start && d <= end) {
-          dates.add(date);
-        }
-      });
-    });
-    const sorted = Array.from(dates).sort();
-    if (sorted.length > 0) {
-      return sorted;
-    }
-    const fallback = [];
-    for (let i = 0; i < 4; i += 1) {
-      const d = new Date(year, month - 1, 1 + i * 7);
-      fallback.push(d.toISOString().split('T')[0]);
-    }
-    return fallback;
-  };
-
-  const generateWeeklyDates = (startDateValue: string, count: number) => {
     const start = new Date(startDateValue);
-    if (!startDateValue || Number.isNaN(start.getTime()) || count <= 0) {
+    if (Number.isNaN(start.getTime())) {
       return [];
     }
-    const dates: string[] = [];
-    for (let i = 0; i < count; i += 1) {
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+    const dates: Date[] = [];
+
+    const forward: Date[] = [];
+    for (let i = 0; i < 4; i += 1) {
       const d = new Date(start);
       d.setDate(d.getDate() + i * 7);
-      dates.push(d.toISOString().split('T')[0]);
+      if (d >= monthStart && d <= monthEnd) {
+        forward.push(d);
+      }
     }
-    return dates;
+
+    const backward: Date[] = [];
+    let step = 1;
+    while (forward.length + backward.length < 4) {
+      const d = new Date(start);
+      d.setDate(d.getDate() - step * 7);
+      if (d >= monthStart && d <= monthEnd) {
+        backward.push(d);
+      } else {
+        break;
+      }
+      step += 1;
+    }
+
+    dates.push(...backward.reverse(), ...forward);
+    return dates
+      .filter((d) => d >= monthStart && d <= monthEnd)
+      .map((d) => d.toISOString().split('T')[0]);
   };
+
+  const groupStartDate = useMemo(() => {
+    const dates = loans
+      .map((loan) => getLoanStartDate(loan))
+      .filter(Boolean)
+      .sort();
+    return dates[0] ?? '';
+  }, [loans]);
+
+  const printDates = useMemo(
+    () => buildMonthlyWeeklyDates(exportMonth, groupStartDate),
+    [exportMonth, groupStartDate]
+  );
 
   const loadPrintData = async (monthValue: string, force = false) => {
     if (printLoading) {
       return null;
     }
-    if (!force && printMonth === monthValue && printDates.length > 0) {
+    if (!force && printMonth === monthValue && printSchedules.size > 0) {
       return {
-        dates: printDates,
         schedules: printSchedules
       };
     }
@@ -345,135 +345,25 @@ export function GroupMembersModule({group, loans}: Props) {
       })
     );
     const scheduleMap = new Map(schedules);
-    const dates = buildPrintDates(scheduleMap, monthValue);
     const loanScheduleMaps = new Map(
       schedules.map(([loanId, entries]) => [
         loanId,
         new Map((entries ?? []).map((row: any) => [row.expected_date, row]))
       ])
     );
-    setPrintDates(dates);
-    setSelectedPrintDates([]);
     setPrintSchedules(loanScheduleMaps);
     setPrintMonth(monthValue);
     setPrintLoading(false);
     return {
-      dates,
       schedules: loanScheduleMaps
     };
-  };
-
-  const exportGroupLoans = async () => {
-    if (loans.length === 0) {
-      return;
-    }
-
-    const schedules: Array<[string, any[]]> = await Promise.all(
-      loans.map(async (loan) => {
-        try {
-          const data = await getLoanSchedulesAction(loan.id);
-          return [loan.id, (data ?? []) as any[]];
-        } catch {
-          return [loan.id, []];
-        }
-      })
-    );
-
-    const scheduleMap = new Map(schedules);
-    const columns = buildScheduleColumns(scheduleMap);
-    const rows = loans.map((loan) => ({
-      memberName: loan.memberName,
-      loanNumber: loan.loanNumber,
-      loanAmount: loan.disbursementAmount,
-      installment: loan.installmentSize,
-      outstanding: loan.outstandingBalance,
-      scheduleMap: new Map(
-        (scheduleMap.get(loan.id) ?? []).map((row: any) => [row.expected_date, row])
-      )
-    }));
-
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Women Group Loans');
-
-    sheet.mergeCells('A1', 'I1');
-    sheet.getCell('A1').value = `Viva Brightlife Microfinance - ${group.groupName}`;
-    sheet.getCell('A1').font = {size: 14, bold: true};
-    sheet.getCell('A1').alignment = {vertical: 'middle'};
-
-    sheet.mergeCells('A2', 'I2');
-    sheet.getCell('A2').value = `Group Number: ${group.groupNumber} | Month: ${exportMonth}`;
-    sheet.getCell('A2').font = {size: 11, color: {argb: '6B7280'}};
-
-    const headerRow = [
-      'Member',
-      'Loan Number',
-      'Loan Amount',
-      'Installment',
-      'OS Balance',
-      ...columns
-    ];
-    const header = sheet.addRow(headerRow);
-    header.font = {bold: true, color: {argb: 'FFFFFF'}};
-    header.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: '1F2937'}};
-    header.alignment = {vertical: 'middle'};
-
-    const numberFormat = '#,##0';
-    rows.forEach((row) => {
-      const scheduleValues = columns.map((date) => {
-        const schedule = row.scheduleMap.get(date);
-        if (!schedule) {
-          return '-';
-        }
-        const value =
-          schedule.paid_amount && schedule.paid_amount > 0
-            ? schedule.paid_amount
-            : schedule.expected_amount ?? 0;
-        return value ? Number(value) : '-';
-      });
-      const dataRow = sheet.addRow([
-        row.memberName,
-        row.loanNumber,
-        Number(row.loanAmount ?? 0),
-        Number(row.installment ?? 0),
-        Number(row.outstanding ?? 0),
-        ...scheduleValues
-      ]);
-
-      dataRow.getCell(3).numFmt = numberFormat;
-      dataRow.getCell(4).numFmt = numberFormat;
-      dataRow.getCell(5).numFmt = numberFormat;
-      scheduleValues.forEach((value, idx) => {
-        if (typeof value === 'number') {
-          dataRow.getCell(6 + idx).numFmt = numberFormat;
-        }
-      });
-    });
-
-    sheet.columns = headerRow.map((label) => ({
-      header: label,
-      key: label,
-      width: Math.max(14, Math.min(24, label.length + 2))
-    }));
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `women-groups-${group.groupName}-${exportMonth}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   };
 
   const exportGroupLoansPdf = async () => {
     if (loans.length === 0) {
       return;
     }
-    if (selectedPrintDates.length === 0) {
+    if (printDates.length === 0) {
       return;
     }
 
@@ -502,7 +392,7 @@ export function GroupMembersModule({group, loans}: Props) {
       'Loan Amount',
       'Installment',
       'OS Balance',
-      ...selectedPrintDates.map(formatDateLabel)
+      ...printDates.map(formatDateLabel)
     ];
 
     const body = loans.map((loan) => [
@@ -511,9 +401,7 @@ export function GroupMembersModule({group, loans}: Props) {
       formatNumber(loan.disbursementAmount),
       formatNumber(loan.installmentSize),
       formatNumber(loan.outstandingBalance),
-      ...selectedPrintDates.map((date) =>
-        getExpectedAmount(loan, date, schedulesSource)
-      )
+      ...printDates.map((date) => getExpectedAmount(loan, date, schedulesSource))
     ]);
 
     const totalsRow = [
@@ -522,7 +410,10 @@ export function GroupMembersModule({group, loans}: Props) {
       '',
       '',
       '',
-      ...selectedPrintDates.map((date) => {
+      ...printDates.map((date) => {
+        if (groupStartDate && date < groupStartDate) {
+          return '-';
+        }
         const total = loans.reduce(
           (sum, loan) => sum + getExpectedAmountValue(loan, date, schedulesSource),
           0
@@ -531,12 +422,25 @@ export function GroupMembersModule({group, loans}: Props) {
       })
     ];
 
+    const signatureRows = [
+      [
+        'JINA LA MHASIBU: _____________________________________________  ',
+        '',
+        '',
+        '',
+        'SAHIHI (MHASIBU)',
+        ...printDates.map(() => '________')
+      ],
+      ['JINA LA C.O: __________________________________________ ', '', '', '', ' SAHIHI (C.O)', ...printDates.map(() => '________')]
+    ];
+
     autoTable(doc, {
       head: [headers],
-      body: [...body, totalsRow],
-      startY: 28,
+      body: [...body, totalsRow, ...signatureRows],
+      startY: 42,
       styles: {fontSize: 7, cellPadding: 2},
-      headStyles: {fillColor: [17, 42, 61]},
+      headStyles: {fillColor: [10, 32, 59]},
+      alternateRowStyles: {fillColor: [217, 232, 255]},
       didParseCell: (data) => {
         if (data.row.index === body.length) {
           data.cell.styles.fontStyle = 'bold';
@@ -791,8 +695,6 @@ export function GroupMembersModule({group, loans}: Props) {
                 value={exportMonth}
                 onChange={(e) => {
                   setExportMonth(e.target.value);
-                  setPrintDates([]);
-                  setSelectedPrintDates([]);
                   setPrintSchedules(new Map());
                   setPrintMonth('');
                 }}
@@ -800,161 +702,58 @@ export function GroupMembersModule({group, loans}: Props) {
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                onClick={() => void loadPrintData(exportMonth, true)}
-                disabled={printLoading}
+                onClick={async () => {
+                  if (printSchedules.size === 0 || printMonth !== exportMonth) {
+                    await loadPrintData(exportMonth, true);
+                  }
+                  setTimeout(() => window.print(), 120);
+                }}
+                disabled={printDates.length === 0 || !groupStartDate}
               >
-                {printLoading ? 'Loading dates...' : 'Load Dates'}
+                <Printer size={16} /> Print
               </button>
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
                 onClick={async () => {
-                  if (printDates.length === 0 || printMonth !== exportMonth) {
+                  if (printSchedules.size === 0 || printMonth !== exportMonth) {
                     await loadPrintData(exportMonth, true);
-                    return;
                   }
-                  setTimeout(() => window.print(), 120);
+                  void exportGroupLoansPdf();
                 }}
-                disabled={selectedPrintDates.length === 0}
+                disabled={printDates.length === 0 || !groupStartDate}
               >
-                <Printer size={16} /> Print
-              </button>
-              <select
-                className="rounded-lg border bg-background px-3 py-2 text-sm"
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as 'excel' | 'pdf')}
-              >
-                <option value="excel">Excel (XLSX)</option>
-                <option value="pdf">PDF</option>
-              </select>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                onClick={() => {
-                  if (exportFormat === 'pdf') {
-                    void exportGroupLoansPdf();
-                    return;
-                  }
-                  void exportGroupLoans();
-                }}
-                disabled={exportFormat === 'pdf' && selectedPrintDates.length === 0}
-              >
-                <Download size={16} /> Export
+                <Download size={16} /> Download PDF
               </button>
             </div>
           </div>
           <div className="no-print rounded-xl border bg-card p-3">
-            <p className="text-sm font-medium text-foreground">Select dates to print</p>
+            <p className="text-sm font-medium text-foreground">Monthly print logic</p>
             <p className="text-xs text-muted-foreground">
-              Click "Load Dates" after choosing the month, then select the dates.
+              Choose the month. The sheet uses each loan's return start date to build
+              four weekly dates for the month, and dates before a loan starts show
+              a hyphen.
             </p>
-            <div className="mt-3 flex flex-wrap items-end gap-2">
-              <div className="flex flex-col gap-1 text-xs">
-                <label className="text-muted-foreground">Custom start date</label>
-                <input
-                  type="date"
-                  className="rounded-md border bg-background px-2 py-1 text-xs"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1 text-xs">
-                <label className="text-muted-foreground">Weeks</label>
-                <input
-                  type="number"
-                  min={1}
-                  className="w-20 rounded-md border bg-background px-2 py-1 text-xs"
-                  value={customWeeks}
-                  onChange={(e) =>
-                    setCustomWeeks(Math.max(1, Number(e.target.value || 1)))
-                  }
-                />
-              </div>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
-                onClick={() => {
-                  const generated = generateWeeklyDates(customStartDate, customWeeks);
-                  if (generated.length === 0) return;
-                  setPrintDates(generated);
-                  setSelectedPrintDates(generated);
-                  setPrintMonth(exportMonth);
-                }}
-              >
-                Use weekly dates
-              </button>
-            </div>
-            {printDates.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
-                  onClick={() => setSelectedPrintDates(printDates)}
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
-                  onClick={() => setSelectedPrintDates([])}
-                >
-                  Clear
-                </button>
-              </div>
-            ) : null}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {printDates.length === 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  No dates loaded yet.
-                </span>
-              ) : (
-                printDates.map((date) => {
-                  const checked = selectedPrintDates.includes(date);
-                  return (
-                    <label
-                      key={date}
-                      className="inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          setSelectedPrintDates((current) =>
-                            e.target.checked
-                              ? [...current, date]
-                              : current.filter((item) => item !== date)
-                          );
-                        }}
-                      />
-                      {formatDateLabel(date)}
-                    </label>
-                  );
-                })
-              )}
-            </div>
           </div>
-          <div className="print-only space-y-3">
-            <div className="rounded-xl border bg-card p-3">
+          <div className="print-only print-pdf space-y-0">
+            <div className="print-header rounded-xl border bg-slate-900 text-white p-3">
               <div className="text-sm font-semibold">
                 Viva Brightlife Microfinance - {group.groupName}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-slate-200">
                 Group Number: {group.groupNumber} | Month: {exportMonth}
               </div>
             </div>
-            <div className="rounded-xl border bg-card overflow-x-auto print-fit">
-              <table className="min-w-[1200px] w-full text-xs">
-                <thead className="bg-muted/70 text-left">
+            <div className="print-table rounded-xl border bg-card overflow-x-auto print-fit -mt-1">
+              <table className="min-w-[1200px] w-full text-xs table-fixed">
+                <thead className="bg-slate-900 text-white text-left">
                   <tr>
                     <th className="px-3 py-2">Member</th>
                     <th className="px-3 py-2">Loan Number</th>
                     <th className="px-3 py-2">Loan Amount</th>
                     <th className="px-3 py-2">Installment</th>
                     <th className="px-3 py-2">OS Balance</th>
-                    {(selectedPrintDates.length > 0
-                      ? selectedPrintDates
-                      : printDates
-                    ).map((date) => (
+                    {printDates.map((date) => (
                       <th key={date} className="px-3 py-2">
                         {formatDateLabel(date)}
                       </th>
@@ -969,10 +768,7 @@ export function GroupMembersModule({group, loans}: Props) {
                       <td className="px-3 py-2">{formatCurrency(loan.disbursementAmount)}</td>
                       <td className="px-3 py-2">{formatCurrency(loan.installmentSize)}</td>
                       <td className="px-3 py-2">{formatCurrency(loan.outstandingBalance)}</td>
-                      {(selectedPrintDates.length > 0
-                        ? selectedPrintDates
-                        : printDates
-                      ).map((date) => (
+                      {printDates.map((date) => (
                         <td key={`${loan.id}-${date}`} className="px-3 py-2">
                           {getExpectedAmount(loan, date, printSchedules)}
                         </td>
@@ -986,10 +782,7 @@ export function GroupMembersModule({group, loans}: Props) {
                       <td className="px-3 py-2"></td>
                       <td className="px-3 py-2"></td>
                       <td className="px-3 py-2"></td>
-                      {(selectedPrintDates.length > 0
-                        ? selectedPrintDates
-                        : printDates
-                      ).map((date) => {
+                      {printDates.map((date) => {
                         const total = loans.reduce(
                           (sum, loan) =>
                             sum + getExpectedAmountValue(loan, date, printSchedules),
@@ -997,22 +790,61 @@ export function GroupMembersModule({group, loans}: Props) {
                         );
                         return (
                           <td key={`total-${date}`} className="px-3 py-2">
-                            {total ? formatNumber(total) : ''}
+                            {groupStartDate && date < groupStartDate
+                              ? '-'
+                              : total
+                                ? formatNumber(total)
+                                : ''}
                           </td>
                         );
                       })}
                     </tr>
                   ) : null}
+                  {loans.length > 0 ? (
+                    <>
+                      <tr className="border-t">
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">JINA LA MHASIBU:</span>
+                            <span className="inline-block w-32 border-b border-slate-400" />
+                            <span className="font-semibold">SAHIHI (MHASIBU)</span>
+                          </div>
+                        </td>
+                        {printDates.map((date) => (
+                          <td key={`mh-${date}`} className="px-3 py-2">
+                            <span className="inline-block w-full border-b border-slate-400" />
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">JINA LA C.O:</span>
+                            <span className="inline-block w-32 border-b border-slate-400" />
+                            <span className="font-semibold">SAHIHI (C.O)</span>
+                          </div>
+                        </td>
+                        {printDates.map((date) => (
+                          <td key={`co-${date}`} className="px-3 py-2">
+                            <span className="inline-block w-full border-b border-slate-400" />
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  ) : null}
                   {loans.length === 0 ? (
                     <tr>
                       <td
                         className="px-3 py-6 text-center text-muted-foreground"
-                        colSpan={
-                          5 +
-                          (selectedPrintDates.length > 0
-                            ? selectedPrintDates.length
-                            : printDates.length)
-                        }
+                        colSpan={5 + printDates.length}
                       >
                         No records found.
                       </td>
@@ -1021,6 +853,7 @@ export function GroupMembersModule({group, loans}: Props) {
                 </tbody>
               </table>
             </div>
+            
           </div>
           <div className="no-print">
             <LoanTable loanType="vikundi_wakinamama" rows={loans} count={loans.length} />

@@ -226,6 +226,12 @@ export function LoanForm({loanType, onClose}: Props) {
         name="disbursementDate"
       />
       <input
+        type="date"
+        className="rounded-lg border bg-background px-3 py-2 text-sm"
+        name="returnStartDate"
+        placeholder="Return Start Date (optional)"
+      />
+      <input
         type="text"
         inputMode="numeric"
         className="rounded-lg border bg-background px-3 py-2 text-sm"
