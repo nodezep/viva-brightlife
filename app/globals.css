@@ -60,12 +60,33 @@ body {
     margin: 12mm;
   }
 
+  body {
+    overflow: visible !important;
+  }
+
   .no-print {
     display: none !important;
   }
 
   .print-only {
     display: block !important;
+  }
+
+  .print-fit,
+  .print-fit .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  .print-fit table {
+    width: 100% !important;
+    table-layout: fixed;
+  }
+
+  .print-fit th,
+  .print-fit td {
+    padding: 4px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
   }
 
   .print-area {

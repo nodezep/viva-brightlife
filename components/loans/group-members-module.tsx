@@ -42,8 +42,14 @@ export function GroupMembersModule({group, loans}: Props) {
   });
   const [printDates, setPrintDates] = useState<string[]>([]);
   const [selectedPrintDates, setSelectedPrintDates] = useState<string[]>([]);
+  const [printSchedules, setPrintSchedules] = useState<Map<string, Map<string, any>>>(
+    new Map()
+  );
   const [printLoading, setPrintLoading] = useState(false);
   const [printMonth, setPrintMonth] = useState('');
+  const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customWeeks, setCustomWeeks] = useState(4);
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -208,6 +214,32 @@ export function GroupMembersModule({group, loans}: Props) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(value);
 
+  const formatNumber = (value: number) =>
+    new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(value);
+
+  const getExpectedAmount = (
+    loan: LoanRecord,
+    date: string,
+    schedulesMap: Map<string, Map<string, any>>
+  ) => {
+    const schedule = schedulesMap.get(loan.id)?.get(date);
+    const expected =
+      schedule?.expected_amount ?? schedule?.expectedAmount ?? loan.installmentSize;
+    return expected ? formatNumber(Number(expected)) : '';
+  };
+
+  const getExpectedAmountValue = (
+    loan: LoanRecord,
+    date: string,
+    schedulesMap: Map<string, Map<string, any>>
+  ) => {
+    const schedule = schedulesMap.get(loan.id)?.get(date);
+    const expected =
+      schedule?.expected_amount ?? schedule?.expectedAmount ?? loan.installmentSize;
+    const numeric = Number(expected);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+
   const formatDateLabel = (value: string) => {
     if (!value || value.startsWith('Week')) {
       return value;
@@ -277,12 +309,29 @@ export function GroupMembersModule({group, loans}: Props) {
     return fallback;
   };
 
+  const generateWeeklyDates = (startDateValue: string, count: number) => {
+    const start = new Date(startDateValue);
+    if (!startDateValue || Number.isNaN(start.getTime()) || count <= 0) {
+      return [];
+    }
+    const dates: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i * 7);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    return dates;
+  };
+
   const loadPrintData = async (monthValue: string, force = false) => {
     if (printLoading) {
-      return;
+      return null;
     }
     if (!force && printMonth === monthValue && printDates.length > 0) {
-      return;
+      return {
+        dates: printDates,
+        schedules: printSchedules
+      };
     }
     setPrintLoading(true);
     const schedules: Array<[string, any[]]> = await Promise.all(
@@ -297,10 +346,21 @@ export function GroupMembersModule({group, loans}: Props) {
     );
     const scheduleMap = new Map(schedules);
     const dates = buildPrintDates(scheduleMap, monthValue);
+    const loanScheduleMaps = new Map(
+      schedules.map(([loanId, entries]) => [
+        loanId,
+        new Map((entries ?? []).map((row: any) => [row.expected_date, row]))
+      ])
+    );
     setPrintDates(dates);
     setSelectedPrintDates([]);
+    setPrintSchedules(loanScheduleMaps);
     setPrintMonth(monthValue);
     setPrintLoading(false);
+    return {
+      dates,
+      schedules: loanScheduleMaps
+    };
   };
 
   const exportGroupLoans = async () => {
@@ -409,9 +469,87 @@ export function GroupMembersModule({group, loans}: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const exportGroupLoansPdf = async () => {
+    if (loans.length === 0) {
+      return;
+    }
+    if (selectedPrintDates.length === 0) {
+      return;
+    }
+
+    const snapshot =
+      printSchedules.size > 0
+        ? {schedules: printSchedules}
+        : await loadPrintData(exportMonth, true);
+    const schedulesSource = snapshot?.schedules ?? new Map();
+
+    const [{jsPDF}, {default: autoTable}] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ]);
+
+    const doc = new jsPDF({orientation: 'landscape'});
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(`Viva Brightlife Microfinance - ${group.groupName}`, 14, 16);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Group Number: ${group.groupNumber} | Month: ${exportMonth}`, 14, 22);
+
+    const headers = [
+      'Member',
+      'Loan Number',
+      'Loan Amount',
+      'Installment',
+      'OS Balance',
+      ...selectedPrintDates.map(formatDateLabel)
+    ];
+
+    const body = loans.map((loan) => [
+      loan.memberName,
+      loan.loanNumber,
+      formatNumber(loan.disbursementAmount),
+      formatNumber(loan.installmentSize),
+      formatNumber(loan.outstandingBalance),
+      ...selectedPrintDates.map((date) =>
+        getExpectedAmount(loan, date, schedulesSource)
+      )
+    ]);
+
+    const totalsRow = [
+      'TOTAL',
+      '',
+      '',
+      '',
+      '',
+      ...selectedPrintDates.map((date) => {
+        const total = loans.reduce(
+          (sum, loan) => sum + getExpectedAmountValue(loan, date, schedulesSource),
+          0
+        );
+        return total ? formatNumber(total) : '';
+      })
+    ];
+
+    autoTable(doc, {
+      head: [headers],
+      body: [...body, totalsRow],
+      startY: 28,
+      styles: {fontSize: 7, cellPadding: 2},
+      headStyles: {fillColor: [17, 42, 61]},
+      didParseCell: (data) => {
+        if (data.row.index === body.length) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+
+    doc.save(`women-groups-${group.groupName}-${exportMonth}.pdf`);
+  };
+
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 no-print">
         <div>
           <button
             type="button"
@@ -655,6 +793,7 @@ export function GroupMembersModule({group, loans}: Props) {
                   setExportMonth(e.target.value);
                   setPrintDates([]);
                   setSelectedPrintDates([]);
+                  setPrintSchedules(new Map());
                   setPrintMonth('');
                 }}
               />
@@ -680,10 +819,25 @@ export function GroupMembersModule({group, loans}: Props) {
               >
                 <Printer size={16} /> Print
               </button>
+              <select
+                className="rounded-lg border bg-background px-3 py-2 text-sm"
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value as 'excel' | 'pdf')}
+              >
+                <option value="excel">Excel (XLSX)</option>
+                <option value="pdf">PDF</option>
+              </select>
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-                onClick={() => void exportGroupLoans()}
+                onClick={() => {
+                  if (exportFormat === 'pdf') {
+                    void exportGroupLoansPdf();
+                    return;
+                  }
+                  void exportGroupLoans();
+                }}
+                disabled={exportFormat === 'pdf' && selectedPrintDates.length === 0}
               >
                 <Download size={16} /> Export
               </button>
@@ -694,6 +848,42 @@ export function GroupMembersModule({group, loans}: Props) {
             <p className="text-xs text-muted-foreground">
               Click "Load Dates" after choosing the month, then select the dates.
             </p>
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="text-muted-foreground">Custom start date</label>
+                <input
+                  type="date"
+                  className="rounded-md border bg-background px-2 py-1 text-xs"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="text-muted-foreground">Weeks</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-20 rounded-md border bg-background px-2 py-1 text-xs"
+                  value={customWeeks}
+                  onChange={(e) =>
+                    setCustomWeeks(Math.max(1, Number(e.target.value || 1)))
+                  }
+                />
+              </div>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs"
+                onClick={() => {
+                  const generated = generateWeeklyDates(customStartDate, customWeeks);
+                  if (generated.length === 0) return;
+                  setPrintDates(generated);
+                  setSelectedPrintDates(generated);
+                  setPrintMonth(exportMonth);
+                }}
+              >
+                Use weekly dates
+              </button>
+            </div>
             {printDates.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
@@ -752,7 +942,7 @@ export function GroupMembersModule({group, loans}: Props) {
                 Group Number: {group.groupNumber} | Month: {exportMonth}
               </div>
             </div>
-            <div className="rounded-xl border bg-card overflow-x-auto">
+            <div className="rounded-xl border bg-card overflow-x-auto print-fit">
               <table className="min-w-[1200px] w-full text-xs">
                 <thead className="bg-muted/70 text-left">
                   <tr>
@@ -784,11 +974,35 @@ export function GroupMembersModule({group, loans}: Props) {
                         : printDates
                       ).map((date) => (
                         <td key={`${loan.id}-${date}`} className="px-3 py-2">
-                          {'\u00A0'}
+                          {getExpectedAmount(loan, date, printSchedules)}
                         </td>
                       ))}
                     </tr>
                   ))}
+                  {loans.length > 0 ? (
+                    <tr className="border-t font-semibold">
+                      <td className="px-3 py-2">TOTAL</td>
+                      <td className="px-3 py-2"></td>
+                      <td className="px-3 py-2"></td>
+                      <td className="px-3 py-2"></td>
+                      <td className="px-3 py-2"></td>
+                      {(selectedPrintDates.length > 0
+                        ? selectedPrintDates
+                        : printDates
+                      ).map((date) => {
+                        const total = loans.reduce(
+                          (sum, loan) =>
+                            sum + getExpectedAmountValue(loan, date, printSchedules),
+                          0
+                        );
+                        return (
+                          <td key={`total-${date}`} className="px-3 py-2">
+                            {total ? formatNumber(total) : ''}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ) : null}
                   {loans.length === 0 ? (
                     <tr>
                       <td
