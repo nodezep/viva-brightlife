@@ -26,12 +26,13 @@ export function LanguageToggle() {
   return (
     <button
       type="button"
-      className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+      className="rounded-lg border px-2 py-2 text-xs hover:bg-muted sm:px-3 sm:text-sm"
       onClick={toggle}
       aria-label="toggle language"
     >
       <span className="inline-flex items-center gap-2">
-        <Languages size={16} /> {locale.toUpperCase()}
+        <Languages size={16} />
+        <span className="hidden sm:inline">{locale.toUpperCase()}</span>
       </span>
     </button>
   );

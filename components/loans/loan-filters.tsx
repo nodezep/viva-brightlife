@@ -46,8 +46,12 @@ export function LoanFilters({defaultSort = 'newest'}: Props) {
   );
 
   return (
-    <div className={`no-print grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-5 ${isPending ? 'opacity-50' : ''}`}>
-      <label className="relative md:col-span-2">
+    <div
+      className={`no-print grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 md:grid-cols-5 ${
+        isPending ? 'opacity-50' : ''
+      }`}
+    >
+      <label className="relative sm:col-span-2 md:col-span-2">
         <Search className="pointer-events-none absolute left-3 top-2.5" size={16} />
         <input
           className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm"
@@ -59,39 +63,48 @@ export function LoanFilters({defaultSort = 'newest'}: Props) {
           }}
         />
       </label>
-      <input
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        value={startDate}
-        onChange={(e) => {
-          setStartDate(e.target.value);
-          applyFilters(query, e.target.value, endDate, sort);
-        }}
-      />
-      <input
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        value={endDate}
-        onChange={(e) => {
-          setEndDate(e.target.value);
-          applyFilters(query, startDate, e.target.value, sort);
-        }}
-      />
-      <select
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        value={sort}
-        onChange={(e) => {
-          setSort(e.target.value);
-          applyFilters(query, startDate, endDate, e.target.value);
-        }}
-      >
-        <option value="newest">Newest</option>
-        <option value="oldest">Oldest</option>
-        <option value="sno_asc">S/NO (Asc)</option>
-        <option value="sno_desc">S/NO (Desc)</option>
-        <option value="name_asc">Name (A-Z)</option>
-        <option value="name_desc">Name (Z-A)</option>
-      </select>
+      <label className="grid gap-1">
+        <span className="text-xs font-semibold text-muted-foreground">Start</span>
+        <input
+          type="date"
+          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          value={startDate}
+          onChange={(e) => {
+            setStartDate(e.target.value);
+            applyFilters(query, e.target.value, endDate, sort);
+          }}
+        />
+      </label>
+      <label className="grid gap-1">
+        <span className="text-xs font-semibold text-muted-foreground">End</span>
+        <input
+          type="date"
+          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          value={endDate}
+          onChange={(e) => {
+            setEndDate(e.target.value);
+            applyFilters(query, startDate, e.target.value, sort);
+          }}
+        />
+      </label>
+      <label className="grid gap-1 sm:col-span-2 md:col-span-1">
+        <span className="text-xs font-semibold text-muted-foreground">Sort</span>
+        <select
+          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value);
+            applyFilters(query, startDate, endDate, e.target.value);
+          }}
+        >
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="sno_asc">S/NO (Asc)</option>
+          <option value="sno_desc">S/NO (Desc)</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="name_desc">Name (Z-A)</option>
+        </select>
+      </label>
     </div>
   );
 }

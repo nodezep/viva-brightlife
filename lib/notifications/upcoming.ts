@@ -28,6 +28,7 @@ type UpcomingSchedule = {
         loan_number: string;
         outstanding_balance: number;
         status: string;
+        repayment_frequency?: 'weekly' | 'daily' | null;
         members:
           | {id: string; full_name: string; phone: string | null}
           | {id: string; full_name: string; phone: string | null}[]
@@ -108,7 +109,7 @@ export async function getUpcomingDueReminders(options?: {
   const {data, error} = await supabase
     .from('loan_schedules')
     .select(
-      'id,loan_id,expected_date,expected_amount,paid_amount,loans!inner(id,loan_number,outstanding_balance,status,members(id,full_name,phone))'
+      'id,loan_id,expected_date,expected_amount,paid_amount,loans!inner(id,loan_number,outstanding_balance,status,repayment_frequency,members(id,full_name,phone))'
     )
     .eq('status', 'pending')
     .gte('expected_date', today)
@@ -124,6 +125,9 @@ export async function getUpcomingDueReminders(options?: {
     .map((row) => {
       const loan = row.loans;
       if (!loan || loan.status !== 'active') {
+        return null;
+      }
+      if (loan.repayment_frequency === 'daily') {
         return null;
       }
       if (Number(loan.outstanding_balance ?? 0) <= 0) {

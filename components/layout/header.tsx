@@ -49,12 +49,9 @@ export function Header({onToggleSidebar, onToggleCollapse, collapsed, adminEmail
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <BrandLogo size={40} />
+              <BrandLogo size={36} />
               <div>
                 <p className="text-sm font-semibold tracking-wide text-primary">{t('app.name')}</p>
-                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                  {t('app.admin')}
-                </p>
               </div>
             </div>
           </div>
@@ -62,14 +59,14 @@ export function Header({onToggleSidebar, onToggleCollapse, collapsed, adminEmail
         <div className="flex items-center gap-2 md:gap-3">
           <LanguageToggle />
           <ThemeToggle />
-          <div className="rounded-lg border px-3 py-2 text-sm">
+          <div className="hidden rounded-lg border px-3 py-2 text-sm sm:flex">
             <div className="flex items-center gap-2">
               <UserCircle2 size={16} />
               <span className="hidden md:inline">{adminEmail}</span>
             </div>
           </div>
           <button
-            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            className="rounded-lg bg-primary px-2 py-2 text-xs font-medium text-primary-foreground sm:px-3 sm:text-sm"
             onClick={onLogout}
           >
             {t('buttons.logout')}

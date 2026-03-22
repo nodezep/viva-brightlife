@@ -15,6 +15,7 @@ type CandidateLoan = {
   duration_months: number;
   overdue_amount: number;
   outstanding_balance: number;
+  repayment_frequency?: 'weekly' | 'daily' | null;
   members:
     | {id: string; full_name: string; phone: string | null}
     | {id: string; full_name: string; phone: string | null}[]
@@ -152,7 +153,7 @@ export async function queueOverdueReminders() {
     supabase
       .from('loans')
       .select(
-        'id,loan_number,disbursement_date,duration_months,overdue_amount,outstanding_balance,members(id,full_name,phone)'
+        'id,loan_number,disbursement_date,duration_months,overdue_amount,outstanding_balance,repayment_frequency,members(id,full_name,phone)'
       )
       .eq('status', 'active')
       .gt('outstanding_balance', 0),
@@ -173,6 +174,9 @@ export async function queueOverdueReminders() {
   for (const loan of loans) {
     const member = pickOne(loan.members);
     if (!member || !member.phone) {
+      continue;
+    }
+    if (loan.repayment_frequency === 'daily') {
       continue;
     }
 
@@ -316,6 +320,7 @@ type UpcomingSchedule = {
         loan_number: string;
         outstanding_balance: number;
         status: string;
+        repayment_frequency?: 'weekly' | 'daily' | null;
         members:
           | {id: string; full_name: string; phone: string | null}
           | {id: string; full_name: string; phone: string | null}[]
@@ -334,7 +339,7 @@ export async function queueUpcomingReminders() {
     supabase
       .from('loan_schedules')
       .select(
-        'id,loan_id,expected_date,expected_amount,paid_amount,loans!inner(id,loan_number,outstanding_balance,status,members(id,full_name,phone))'
+        'id,loan_id,expected_date,expected_amount,paid_amount,loans!inner(id,loan_number,outstanding_balance,status,repayment_frequency,members(id,full_name,phone))'
       )
       .eq('status', 'pending')
       .gte('expected_date', today)
@@ -357,6 +362,9 @@ export async function queueUpcomingReminders() {
     }
     const loan = schedule.loans;
     if (!loan || loan.status !== 'active') {
+      continue;
+    }
+    if (loan.repayment_frequency === 'daily') {
       continue;
     }
     if (Number(loan.outstanding_balance ?? 0) <= 0) {
@@ -434,7 +442,7 @@ export async function queueLoanReminder(loanId: string) {
   const {data: loan, error} = await supabase
     .from('loans')
     .select(
-      'id,loan_number,disbursement_date,duration_months,overdue_amount,outstanding_balance,members(id,full_name,phone)'
+      'id,loan_number,disbursement_date,duration_months,overdue_amount,outstanding_balance,repayment_frequency,members(id,full_name,phone)'
     )
     .eq('id', loanId)
     .single();
@@ -446,6 +454,9 @@ export async function queueLoanReminder(loanId: string) {
   const member = pickOne((loan as CandidateLoan).members);
   if (!member || !member.phone) {
     throw new Error('Loan member has no phone number');
+  }
+  if ((loan as CandidateLoan).repayment_frequency === 'daily') {
+    throw new Error('Daily repayment loans are excluded from SMS reminders');
   }
 
   const daysOverdue = Math.max(
