@@ -429,33 +429,71 @@ export async function getMarejeshoReportRows(): Promise<MarejeshoRow[]> {
   });
 }
 
-type DashboardRange = 'all' | 'month';
+type DashboardRange = 'all' | 'month' | 'week';
 
 type DashboardMetricOptions = {
   range?: DashboardRange;
   month?: string;
+  week?: string;
 };
 
 export async function getDashboardMetrics(options: DashboardMetricOptions = {}) {
   const supabase = createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const range: DashboardRange = options.range === 'month' ? 'month' : 'all';
+  const range: DashboardRange =
+    options.range === 'month' ? 'month' : options.range === 'week' ? 'week' : 'all';
 
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const month = options.month && /^\d{4}-\d{2}$/.test(options.month)
+  const month =
+    options.month && /^\d{4}-\d{2}$/.test(options.month)
     ? options.month
     : defaultMonth;
 
+  const parseWeekStart = (weekKey: string) => {
+    const match = weekKey.match(/^(\d{4})-W(\d{2})$/);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const week = Number(match[2]);
+    if (!year || !week) return null;
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const jan4Day = jan4.getUTCDay() || 7;
+    const week1Start = new Date(jan4);
+    week1Start.setUTCDate(jan4.getUTCDate() - jan4Day + 1);
+    const start = new Date(week1Start);
+    start.setUTCDate(week1Start.getUTCDate() + (week - 1) * 7);
+    return start.toISOString().slice(0, 10);
+  };
+
+  const defaultWeek = (() => {
+    const base = new Date();
+    const utcDate = new Date(Date.UTC(base.getFullYear(), base.getMonth(), base.getDate()));
+    const day = utcDate.getUTCDay() || 7;
+    utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+    const week = Math.ceil(((utcDate.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return `${utcDate.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+  })();
+
+  const weekKey =
+    options.week && /^\d{4}-W\d{2}$/.test(options.week) ? options.week : defaultWeek;
+
   const [year, monthIndex] = month.split('-').map(Number);
-  const startDate =
-    range === 'month' && year && monthIndex
-      ? new Date(year, monthIndex - 1, 1).toISOString().slice(0, 10)
-      : null;
-  const endDate =
-    range === 'month' && year && monthIndex
-      ? new Date(year, monthIndex, 0).toISOString().slice(0, 10)
-      : null;
+
+  let startDate: string | null = null;
+  let endDate: string | null = null;
+  if (range === 'month' && year && monthIndex) {
+    startDate = new Date(year, monthIndex - 1, 1).toISOString().slice(0, 10);
+    endDate = new Date(year, monthIndex, 0).toISOString().slice(0, 10);
+  } else if (range === 'week') {
+    const weekStart = parseWeekStart(weekKey);
+    if (weekStart) {
+      startDate = weekStart;
+      const start = new Date(`${weekStart}T00:00:00Z`);
+      start.setUTCDate(start.getUTCDate() + 6);
+      endDate = start.toISOString().slice(0, 10);
+    }
+  }
 
   let activeLoansQuery = supabase
     .from('loans')
@@ -468,7 +506,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     .from('loans')
     .select('loan_type,status,principal_amount,outstanding_balance,disbursement_date');
 
-  if (range === 'month' && startDate && endDate) {
+  if (range !== 'all' && startDate && endDate) {
     activeLoansQuery = activeLoansQuery
       .gte('disbursement_date', startDate)
       .lte('disbursement_date', endDate);
@@ -484,23 +522,26 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     .from('loan_schedules')
     .select('loan_id,expected_amount,paid_amount,expected_date,loans!inner(loan_type)');
 
-  if (range === 'month' && startDate && endDate) {
-    scheduleQuery = scheduleQuery
-      .gte('expected_date', startDate)
-      .lte('expected_date', endDate);
-  }
+  const scheduleRangeQuery =
+    range !== 'all' && startDate && endDate
+      ? scheduleQuery.gte('expected_date', startDate).lte('expected_date', endDate)
+      : scheduleQuery;
 
   const [
     {count: activeLoans},
     {data: disbursedRows},
-    {data: scheduleRows},
+    {data: scheduleRangeRows},
+    {data: scheduleAllLoans},
     {count: members},
     {count: groups},
     {data: loanTypeRows}
   ] = await Promise.all([
     activeLoansQuery,
     disbursedQuery,
-    scheduleQuery,
+    scheduleRangeQuery,
+    supabase
+      .from('loans')
+      .select('loan_schedules(expected_amount,paid_amount)'),
     supabase.from('members').select('*', {count: 'exact', head: true}),
     supabase.from('groups').select('*', {count: 'exact', head: true}),
     loanTypeQuery
@@ -511,14 +552,38 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     0
   );
 
-  const totalCollections = (scheduleRows ?? []).reduce(
+  const totalScheduleRows = (scheduleAllLoans ?? []).flatMap(
+    (row) =>
+      (row as {loan_schedules?: Array<{expected_amount?: number; paid_amount?: number}>})
+        .loan_schedules ?? []
+  );
+  const totalCollections = totalScheduleRows.reduce(
     (sum, row) => sum + Number(row.paid_amount ?? 0),
+    0
+  );
+  const totalDue = totalScheduleRows.reduce(
+    (sum, row) => sum + Number(row.expected_amount ?? 0),
     0
   );
 
   const overdueLoanIds = new Set<string>();
+  const todayStr = today;
+  (scheduleRangeRows ?? []).forEach((row) => {
+    if (!row.expected_date) {
+      return;
+    }
+    const expectedAmount = Number(row.expected_amount ?? 0);
+    const paidAmount = Number(row.paid_amount ?? 0);
+    if (paidAmount >= expectedAmount) {
+      return;
+    }
+    if (row.expected_date >= todayStr) {
+      return;
+    }
+    overdueLoanIds.add(row.loan_id);
+  });
 
-  const scheduleTotalsByType = (scheduleRows ?? []).reduce(
+  const scheduleTotalsByType = (scheduleRangeRows ?? []).reduce(
     (acc, row) => {
       const loanType = (row as {loans?: {loan_type?: LoanType}}).loans?.loan_type;
       if (!loanType) {
@@ -587,11 +652,24 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     loanTypeMetrics[loanType].collectedAmount = totals.collectedAmount;
   });
 
+  const totalOutstanding = (loanTypeRows ?? []).reduce(
+    (sum, row) => sum + Number(row.outstanding_balance ?? 0),
+    0
+  );
+  const totalDefaulted = (loanTypeRows ?? []).filter(
+    (row) => row.status === 'defaulted'
+  ).length;
+  const totalLoans = (loanTypeRows ?? []).length;
+
   return {
     totalActiveLoans: activeLoans ?? 0,
     totalDisbursed,
     totalCollections,
+    totalDue,
     overdueLoans: overdueLoanIds.size,
+    totalOutstanding,
+    totalDefaulted,
+    totalLoans,
     activeMembers: members ?? 0,
     activeGroups: groups ?? 0,
     loanTypeMetrics

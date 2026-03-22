@@ -4,6 +4,7 @@ import {useEffect, useState} from 'react';
 import {Header} from './header';
 import {Sidebar} from './sidebar';
 import {MobileNav} from './mobile-nav';
+import {NotificationsPopout} from '@/components/notifications/notifications-popout';
 
 type Props = {
   children: React.ReactNode;
@@ -37,6 +38,7 @@ export function AdminShell({children, adminEmail}: Props) {
         collapsed={collapsed}
         adminEmail={adminEmail}
       />
+      <NotificationsPopout />
       <Sidebar open={open} collapsed={collapsed} onClose={() => setOpen(false)} />
       <main
         className={`print-area px-3 pb-24 pt-20 sm:px-4 lg:px-6 lg:pb-8 ${

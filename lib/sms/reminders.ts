@@ -59,12 +59,12 @@ function interpolateTemplate(
   });
 }
 
-async function getTemplates() {
+async function getTemplates(templateKey: string) {
   const supabase = createAdminClient();
   const {data, error} = await supabase
     .from('sms_templates')
     .select('language,body')
-    .eq('template_key', 'repayment_overdue')
+    .eq('template_key', templateKey)
     .eq('is_active', true);
 
   if (error || !data) {
@@ -72,6 +72,54 @@ async function getTemplates() {
   }
 
   return new Map((data as TemplateRow[]).map((row) => [row.language, row.body]));
+}
+
+function getTodayIsoLocal() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToIso(isoDate: string, days: number) {
+  const base = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(base.getTime())) {
+    return isoDate;
+  }
+  base.setDate(base.getDate() + days);
+  return base.toISOString().split('T')[0];
+}
+
+function diffDays(isoFrom: string, isoTo: string) {
+  const [fromYear, fromMonth, fromDay] = isoFrom.split('-').map(Number);
+  const [toYear, toMonth, toDay] = isoTo.split('-').map(Number);
+  if (!fromYear || !fromMonth || !fromDay || !toYear || !toMonth || !toDay) {
+    return 0;
+  }
+  const fromUtc = Date.UTC(fromYear, fromMonth - 1, fromDay);
+  const toUtc = Date.UTC(toYear, toMonth - 1, toDay);
+  return Math.floor((fromUtc - toUtc) / 86400000);
+}
+
+function getDueSoonWindowDays() {
+  const parsed = Number(process.env.SMS_DUE_SOON_DAYS ?? 3);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.floor(parsed);
+  }
+  return 3;
+}
+
+function getDueSoonSendHour() {
+  const parsed = Number(process.env.SMS_DUE_SOON_HOUR ?? 9);
+  if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 23) {
+    return Math.floor(parsed);
+  }
+  return 9;
+}
+
+function buildDueSoonReminderKey(expectedDate: string) {
+  return `due_soon_${expectedDate}`;
 }
 
 async function getPreferences(memberIds: string[]) {
@@ -108,7 +156,7 @@ export async function queueOverdueReminders() {
       )
       .eq('status', 'active')
       .gt('outstanding_balance', 0),
-    getTemplates()
+    getTemplates('repayment_overdue')
   ]);
 
   const rules = (rulesData ?? []) as ReminderRule[];
@@ -256,6 +304,130 @@ export async function dispatchQueuedReminders(limit = 100) {
   return {sent, failed};
 }
 
+type UpcomingSchedule = {
+  id: string;
+  loan_id: string;
+  expected_date: string;
+  expected_amount: number;
+  paid_amount: number;
+  loans:
+    | {
+        id: string;
+        loan_number: string;
+        outstanding_balance: number;
+        status: string;
+        members:
+          | {id: string; full_name: string; phone: string | null}
+          | {id: string; full_name: string; phone: string | null}[]
+          | null;
+      }
+    | null;
+};
+
+export async function queueUpcomingReminders() {
+  const supabase = createAdminClient();
+  const today = getTodayIsoLocal();
+  const windowDays = getDueSoonWindowDays();
+  const endDate = addDaysToIso(today, windowDays);
+
+  const [{data: scheduleRows}, templates] = await Promise.all([
+    supabase
+      .from('loan_schedules')
+      .select(
+        'id,loan_id,expected_date,expected_amount,paid_amount,loans!inner(id,loan_number,outstanding_balance,status,members(id,full_name,phone))'
+      )
+      .eq('status', 'pending')
+      .gte('expected_date', today)
+      .lte('expected_date', endDate)
+      .order('expected_date', {ascending: true}),
+    getTemplates('repayment_due_soon')
+  ]);
+
+  const schedules = (scheduleRows ?? []) as UpcomingSchedule[];
+  const memberIds = schedules
+    .map((row) => pickOne(row.loans?.members)?.id)
+    .filter((id): id is string => Boolean(id));
+  const preferences = await getPreferences(memberIds);
+
+  let queued = 0;
+
+  for (const schedule of schedules) {
+    if (!schedule.expected_date) {
+      continue;
+    }
+    const loan = schedule.loans;
+    if (!loan || loan.status !== 'active') {
+      continue;
+    }
+    if (Number(loan.outstanding_balance ?? 0) <= 0) {
+      continue;
+    }
+    const member = pickOne(loan.members);
+    if (!member || !member.phone) {
+      continue;
+    }
+    const pref = preferences.get(member.id);
+    if (pref && pref.sms_enabled === false) {
+      continue;
+    }
+    const expectedAmount = Number(schedule.expected_amount ?? 0);
+    const paidAmount = Number(schedule.paid_amount ?? 0);
+    const amountDue = Math.max(0, expectedAmount - paidAmount);
+    if (amountDue <= 0) {
+      continue;
+    }
+    const daysUntil = Math.max(0, diffDays(schedule.expected_date, today));
+    if (daysUntil > windowDays) {
+      continue;
+    }
+
+    const language = pref?.preferred_language ?? 'sw';
+    const template = templates.get(language) ?? templates.get('sw') ?? templates.get('en');
+    if (!template) {
+      continue;
+    }
+
+    const message = interpolateTemplate(template, {
+      member_name: member.full_name,
+      loan_number: loan.loan_number,
+      amount_due: amountDue.toLocaleString(),
+      due_date: schedule.expected_date,
+      days_until: daysUntil,
+      company_name: 'Viva Brightlife'
+    });
+
+    const sendHour = getDueSoonSendHour();
+    const scheduledLocal = new Date(`${schedule.expected_date}T${String(sendHour).padStart(2, '0')}:00:00`);
+    const now = new Date();
+    const scheduled =
+      Number.isNaN(scheduledLocal.getTime()) || scheduledLocal.getTime() < now.getTime()
+        ? new Date(now.getTime() + 60 * 1000)
+        : scheduledLocal;
+
+    const {error} = await supabase.from('sms_reminders').upsert(
+      {
+        loan_id: loan.id,
+        member_id: member.id,
+        reminder_key: buildDueSoonReminderKey(schedule.expected_date),
+        phone: member.phone,
+        message,
+        days_overdue: 0,
+        scheduled_for: scheduled.toISOString(),
+        status: 'queued',
+        delivery_status: 'queued',
+        provider_name: process.env.SMS_PROVIDER ?? 'mock'
+      },
+      {onConflict: 'loan_id,reminder_key', ignoreDuplicates: true}
+    );
+
+    if (!error) {
+      queued += 1;
+    }
+  }
+
+  return {queued, windowDays};
+}
+
 export async function queueLoanReminder(loanId: string) {
   const supabase = createAdminClient();
 
@@ -285,7 +457,7 @@ export async function queueLoanReminder(loanId: string) {
     throw new Error('Loan is not overdue');
   }
 
-  const templates = await getTemplates();
+  const templates = await getTemplates('repayment_overdue');
   const template = templates.get('sw') ?? templates.get('en');
   if (!template) {
     throw new Error('No repayment_overdue template found');

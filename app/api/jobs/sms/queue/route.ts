@@ -1,5 +1,5 @@
 import {NextRequest, NextResponse} from 'next/server';
-import {queueOverdueReminders} from '@/lib/sms/reminders';
+import {queueOverdueReminders, queueUpcomingReminders} from '@/lib/sms/reminders';
 
 export async function POST(request: NextRequest) {
   const token = request.headers.get('x-job-token');
@@ -7,6 +7,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({error: 'Unauthorized'}, {status: 401});
   }
 
-  const result = await queueOverdueReminders();
-  return NextResponse.json(result);
+  const [overdue, upcoming] = await Promise.all([
+    queueOverdueReminders(),
+    queueUpcomingReminders()
+  ]);
+  return NextResponse.json({
+    overdueQueued: overdue.queued ?? 0,
+    dueSoonQueued: upcoming.queued ?? 0,
+    windowDays: upcoming.windowDays,
+    queued: (overdue.queued ?? 0) + (upcoming.queued ?? 0)
+  });
 }

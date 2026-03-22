@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
-import {queueOverdueReminders} from '@/lib/sms/reminders';
+import {queueOverdueReminders, queueUpcomingReminders} from '@/lib/sms/reminders';
 
 async function ensureAdmin() {
   const supabase = createClient();
@@ -24,6 +24,14 @@ export async function POST() {
     return NextResponse.json({error: 'Unauthorized'}, {status: 401});
   }
 
-  const result = await queueOverdueReminders();
-  return NextResponse.json(result);
+  const [overdue, upcoming] = await Promise.all([
+    queueOverdueReminders(),
+    queueUpcomingReminders()
+  ]);
+  return NextResponse.json({
+    overdueQueued: overdue.queued ?? 0,
+    dueSoonQueued: upcoming.queued ?? 0,
+    windowDays: upcoming.windowDays,
+    queued: (overdue.queued ?? 0) + (upcoming.queued ?? 0)
+  });
 }

@@ -63,10 +63,12 @@
   "dashboard": {
     "total_active_loans": "Jumla ya Mikopo Hai",
     "total_disbursed_month": "Jumla Iliyotolewa Mwezi Huu",
+    "total_disbursed_range": "Jumla Iliyotolewa",
     "total_collections": "Jumla ya Makusanyo",
     "overdue_loans": "Mikopo Iliyochelewa",
     "active_members": "Wanachama Hai",
     "active_groups": "Vikundi Hai",
+    "schedule_coverage": "Ufuatiliaji wa Ratiba",
     "portfolio_breakdown": "Mkopo kwa Makundi",
     "portfolio_title": "Mgawanyo wa Mikopo kwa Aina",
     "portfolio_hint": "Bofya kadi yoyote kufungua moduli husika.",

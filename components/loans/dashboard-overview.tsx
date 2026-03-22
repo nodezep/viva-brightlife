@@ -1,7 +1,7 @@
 'use client';
 
 import {useMemo} from 'react';
-import {Coins, HandCoins, Layers3, Users, Wallet2} from 'lucide-react';
+import {Coins, HandCoins, Users, Wallet2} from 'lucide-react';
 import {useLocale, useTranslations} from 'next-intl';
 import Link from 'next/link';
 import type {LoanType} from '@/types';
@@ -13,7 +13,11 @@ type Props = {
     totalActiveLoans: number;
     totalDisbursed: number;
     totalCollections: number;
+    totalDue: number;
+    totalOutstanding: number;
     overdueLoans: number;
+    totalDefaulted: number;
+    totalLoans: number;
     activeMembers: number;
     activeGroups: number;
     loanTypeMetrics: Record<
@@ -29,8 +33,9 @@ type Props = {
       }
     >;
   };
-  range: 'all' | 'month';
+  range: 'all' | 'month' | 'week';
   month: string;
+  week: string;
 };
 
 const currency = new Intl.NumberFormat('en-US', {
@@ -39,7 +44,7 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0
 });
 
-export function DashboardOverview({metrics, range, month}: Props) {
+export function DashboardOverview({metrics, range, month, week}: Props) {
   const t = useTranslations('dashboard');
   const nav = useTranslations('navigation');
   const locale = useLocale();
@@ -54,39 +59,78 @@ export function DashboardOverview({metrics, range, month}: Props) {
     if (Number.isNaN(parsed.getTime())) {
       return month;
     }
-    return new Intl.DateTimeFormat(locale, {month: 'long', year: 'numeric'}).format(parsed);
-  }, [locale, month, range]);
+    if (range === 'month') {
+      return new Intl.DateTimeFormat(locale, {month: 'long', year: 'numeric'}).format(parsed);
+    }
+    const match = week.match(/^(\d{4})-W(\d{2})$/);
+    if (!match) {
+      return week;
+    }
+    const year = Number(match[1]);
+    const weekNumber = Number(match[2]);
+    if (!year || !weekNumber) {
+      return week;
+    }
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const jan4Day = jan4.getUTCDay() || 7;
+    const week1Start = new Date(jan4);
+    week1Start.setUTCDate(jan4.getUTCDate() - jan4Day + 1);
+    const start = new Date(week1Start);
+    start.setUTCDate(week1Start.getUTCDate() + (weekNumber - 1) * 7);
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+    const format = new Intl.DateTimeFormat(locale, {month: 'short', day: 'numeric'});
+    return `${format.format(start)} - ${format.format(end)}`;
+  }, [locale, month, range, week]);
 
-  const updateRange = (nextRange: 'all' | 'month', nextMonth: string) => {
+  const updateRange = (
+    nextRange: 'all' | 'month' | 'week',
+    nextMonth: string,
+    nextWeek: string
+  ) => {
     const params = new URLSearchParams();
     if (nextRange === 'month') {
       params.set('range', 'month');
       params.set('month', nextMonth);
+    } else if (nextRange === 'week') {
+      params.set('range', 'week');
+      params.set('week', nextWeek);
     }
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname);
   };
 
   const stats = useMemo(
-    () => [
-      {
-        label: t('total_active_loans'),
-        value: metrics.totalActiveLoans.toString(),
-        icon: Wallet2
-      },
-      {
-        label: t('total_disbursed_month'),
-        value: currency.format(metrics.totalDisbursed),
-        icon: HandCoins
-      },
-      {
-        label: t('total_collections'),
-        value: currency.format(metrics.totalCollections),
-        icon: Coins
-      },
-      {label: t('active_members'), value: metrics.activeMembers.toString(), icon: Users},
-      {label: t('active_groups'), value: metrics.activeGroups.toString(), icon: Layers3}
-    ],
+    () => {
+      const avgTicket =
+        metrics.totalLoans > 0 ? metrics.totalDisbursed / metrics.totalLoans : 0;
+      return [
+        {
+          label: t('total_disbursed_range'),
+          value: currency.format(metrics.totalDisbursed),
+          subtext: `Average ticket ${currency.format(avgTicket)}`,
+          icon: HandCoins
+        },
+        {
+          label: t('outstanding_balance'),
+          value: currency.format(metrics.totalOutstanding),
+          subtext: `Active loans ${metrics.totalActiveLoans}`,
+          icon: Wallet2
+        },
+        {
+          label: t('overdue_loans'),
+          value: metrics.overdueLoans.toString(),
+          subtext: `Defaulted ${metrics.totalDefaulted}`,
+          icon: Users
+        },
+        {
+          label: t('schedule_coverage'),
+          value: currency.format(metrics.totalCollections),
+          subtext: `Expected ${currency.format(metrics.totalDue)}`,
+          icon: Coins
+        }
+      ];
+    },
     [metrics, t]
   );
 
@@ -148,20 +192,38 @@ export function DashboardOverview({metrics, range, month}: Props) {
                 value={range}
                 onChange={(event) =>
                   updateRange(
-                    event.target.value === 'month' ? 'month' : 'all',
-                    month
+                    event.target.value === 'month'
+                      ? 'month'
+                      : event.target.value === 'week'
+                        ? 'week'
+                        : 'all',
+                    month,
+                    week
                   )
                 }
               >
                 <option value="all">All time</option>
                 <option value="month">Month</option>
+                <option value="week">Week</option>
               </select>
               {range === 'month' ? (
                 <input
                   type="month"
                   className="rounded-md border bg-background px-2 py-1 text-sm"
                   value={month}
-                  onChange={(event) => updateRange('month', event.target.value)}
+                  onChange={(event) =>
+                    updateRange('month', event.target.value, week)
+                  }
+                />
+              ) : null}
+              {range === 'week' ? (
+                <input
+                  type="week"
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                  value={week}
+                  onChange={(event) =>
+                    updateRange('week', month, event.target.value)
+                  }
                 />
               ) : null}
             </div>
@@ -178,7 +240,7 @@ export function DashboardOverview({metrics, range, month}: Props) {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (
           <article
             key={stat.label}
@@ -191,6 +253,9 @@ export function DashboardOverview({metrics, range, month}: Props) {
               </div>
             </div>
             <p className="mt-3 text-2xl font-semibold tracking-tight">{stat.value}</p>
+            {stat.subtext ? (
+              <p className="mt-2 text-xs text-muted-foreground">{stat.subtext}</p>
+            ) : null}
             <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted">
               <div className="h-full w-2/3 rounded-full bg-primary/40 transition-all group-hover:w-5/6" />
             </div>

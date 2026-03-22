@@ -2,13 +2,16 @@
 
 import {useState} from 'react';
 import type {SmsReminderLog} from '@/lib/sms/data';
+import type {UpcomingDueReminder} from '@/lib/notifications/upcoming';
 
 type Props = {
   initialLogs: SmsReminderLog[];
+  upcomingDue: UpcomingDueReminder[];
 };
 
-export function SmsRemindersModule({initialLogs}: Props) {
+export function SmsRemindersModule({initialLogs, upcomingDue}: Props) {
   const [logs] = useState(initialLogs);
+  const [dueSoon] = useState(upcomingDue);
   const [busy, setBusy] = useState<'queue' | 'dispatch' | 'test' | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [phone, setPhone] = useState('');
@@ -24,7 +27,13 @@ export function SmsRemindersModule({initialLogs}: Props) {
       setBusy(null);
       return;
     }
-    setStatusMessage(`Queued reminders: ${result.queued}`);
+    const overdue = result.overdueQueued ?? 0;
+    const dueSoonCount = result.dueSoonQueued ?? 0;
+    const total = result.queued ?? overdue + dueSoonCount;
+    const windowDays = result.windowDays ? ` (next ${result.windowDays} days)` : '';
+    setStatusMessage(
+      `Queued reminders: ${total} (overdue: ${overdue}, due soon: ${dueSoonCount}${windowDays})`
+    );
     setBusy(null);
     window.location.reload();
   };
@@ -87,7 +96,7 @@ export function SmsRemindersModule({initialLogs}: Props) {
           disabled={busy !== null}
           className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
-          {busy === 'queue' ? 'Queueing...' : 'Queue Overdue Reminders'}
+          {busy === 'queue' ? 'Queueing...' : 'Queue Due + Overdue Reminders'}
         </button>
         <button
           onClick={dispatchNow}
@@ -125,6 +134,52 @@ export function SmsRemindersModule({initialLogs}: Props) {
       {statusMessage ? (
         <p className="rounded-lg border bg-muted px-3 py-2 text-sm">{statusMessage}</p>
       ) : null}
+
+      <div className="overflow-x-auto rounded-xl border bg-card">
+        <table className="w-full min-w-[1100px] text-sm">
+          <thead className="bg-muted/70 text-left">
+            <tr>
+              <th className="px-3 py-2">Due Date</th>
+              <th className="px-3 py-2">Member</th>
+              <th className="px-3 py-2">Phone</th>
+              <th className="px-3 py-2">Loan</th>
+              <th className="px-3 py-2">Amount Due</th>
+              <th className="px-3 py-2">Days Until</th>
+              <th className="px-3 py-2">SMS Status</th>
+              <th className="px-3 py-2">Scheduled For</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dueSoon.map((row) => (
+              <tr key={row.scheduleId} className="border-t">
+                <td className="px-3 py-2">{row.expectedDate}</td>
+                <td className="px-3 py-2">{row.memberName}</td>
+                <td className="px-3 py-2">{row.phone ?? '-'}</td>
+                <td className="px-3 py-2">{row.loanNumber}</td>
+                <td className="px-3 py-2">{row.amountDue.toLocaleString()}</td>
+                <td className="px-3 py-2">{row.daysUntil}</td>
+                <td className="px-3 py-2">
+                  <span className={`rounded px-2 py-1 text-xs ${statusPill(row.reminderStatus)}`}>
+                    {row.reminderStatus === 'not_scheduled' ? 'not scheduled' : row.reminderStatus}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
+                  {row.reminderScheduledFor
+                    ? new Date(row.reminderScheduledFor).toLocaleString()
+                    : '-'}
+                </td>
+              </tr>
+            ))}
+            {dueSoon.length === 0 ? (
+              <tr>
+                <td className="px-3 py-6 text-center text-muted-foreground" colSpan={8}>
+                  No upcoming due payments in the selected window.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full min-w-[1100px] text-sm">
