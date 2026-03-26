@@ -34,6 +34,17 @@ type UpcomingSchedule = {
           | {id: string; full_name: string; phone: string | null}[]
           | null;
       }
+    | {
+        id: string;
+        loan_number: string;
+        outstanding_balance: number;
+        status: string;
+        repayment_frequency?: 'weekly' | 'daily' | null;
+        members:
+          | {id: string; full_name: string; phone: string | null}
+          | {id: string; full_name: string; phone: string | null}[]
+          | null;
+      }[]
     | null;
 };
 
@@ -123,7 +134,7 @@ export async function getUpcomingDueReminders(options?: {
 
   const schedules = (data as UpcomingSchedule[])
     .map((row) => {
-      const loan = row.loans;
+      const loan = pickOne(row.loans);
       if (!loan || loan.status !== 'active') {
         return null;
       }

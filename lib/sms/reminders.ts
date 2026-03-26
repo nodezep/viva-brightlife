@@ -326,6 +326,17 @@ type UpcomingSchedule = {
           | {id: string; full_name: string; phone: string | null}[]
           | null;
       }
+    | {
+        id: string;
+        loan_number: string;
+        outstanding_balance: number;
+        status: string;
+        repayment_frequency?: 'weekly' | 'daily' | null;
+        members:
+          | {id: string; full_name: string; phone: string | null}
+          | {id: string; full_name: string; phone: string | null}[]
+          | null;
+      }[]
     | null;
 };
 
@@ -350,7 +361,7 @@ export async function queueUpcomingReminders() {
 
   const schedules = (scheduleRows ?? []) as UpcomingSchedule[];
   const memberIds = schedules
-    .map((row) => pickOne(row.loans?.members)?.id)
+    .map((row) => pickOne(pickOne(row.loans)?.members)?.id)
     .filter((id): id is string => Boolean(id));
   const preferences = await getPreferences(memberIds);
 
@@ -360,7 +371,7 @@ export async function queueUpcomingReminders() {
     if (!schedule.expected_date) {
       continue;
     }
-    const loan = schedule.loans;
+    const loan = pickOne(schedule.loans);
     if (!loan || loan.status !== 'active') {
       continue;
     }
