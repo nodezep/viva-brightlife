@@ -2,20 +2,18 @@
 
 import {createClient} from '@/lib/supabase/server';
 import {revalidatePath} from 'next/cache';
-
-const addDaysToIso = (isoDate: string, days: number) => {
-  const base = new Date(isoDate);
-  if (Number.isNaN(base.getTime())) {
-    return null;
-  }
-  base.setDate(base.getDate() + days);
-  return base.toISOString().split('T')[0];
-};
+import {
+  addDaysToDateOnly,
+  addMonthsToDateOnly,
+  formatDateOnlyFromUtc,
+  toUtcDate
+} from '@/lib/date-only';
 
 const getDefaultReturnStartDate = (
   disbursementDate: string,
   repaymentFrequency: string
-) => addDaysToIso(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
+) =>
+  addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
 
 const buildWeeklySchedules = (params: {
   loanId: string;
@@ -42,14 +40,24 @@ const buildWeeklySchedules = (params: {
       ? returnStartDate
       : defaultStart || disbursementDate;
 
-  const schedules = [];
+  const schedules: Array<{
+    loan_id: string;
+    week_number: number;
+    expected_date: string;
+    expected_amount: number;
+    status: string;
+  }> = [];
   let remainingAmount = outstandingBalance;
-  let currentDate = new Date(startDate);
+  const start = toUtcDate(startDate) ?? toUtcDate(disbursementDate);
+  if (!start) {
+    return schedules;
+  }
+  let currentDate = new Date(start);
   const isDaily = repaymentFrequency === 'daily';
 
   for (let i = 1; i <= durationWeeks; i++) {
     if (i > 1) {
-      currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
+      currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
     }
     const isLastWeek = i === durationWeeks;
     let expectedAmount = isLastWeek
@@ -60,7 +68,7 @@ const buildWeeklySchedules = (params: {
     schedules.push({
       loan_id: loanId,
       week_number: i,
-      expected_date: currentDate.toISOString().split('T')[0],
+      expected_date: formatDateOnlyFromUtc(currentDate),
       expected_amount: expectedAmount,
       status: 'pending'
     });
@@ -109,24 +117,14 @@ export async function getLoanSchedulesAction(loanId: string) {
     return data;
   }
 
-  const addMonths = (date: Date, months: number) => {
-    const d = new Date(date);
-    const day = d.getDate();
-    d.setMonth(d.getMonth() + months);
-    if (d.getDate() < day) {
-      d.setDate(0);
-    }
-    return d;
-  };
-
   const monthlyInstallment = totalRepay / durationMonths;
   const schedules = [];
-  const disbursementDate = new Date(loanRow.disbursement_date);
 
   for (let month = 1; month <= durationMonths; month++) {
-    const expectedDate = addMonths(disbursementDate, month)
-      .toISOString()
-      .split('T')[0];
+    const expectedDate = addMonthsToDateOnly(loanRow.disbursement_date, month);
+    if (!expectedDate) {
+      continue;
+    }
     schedules.push({
       loan_id: loanId,
       week_number: month,
@@ -332,4 +330,121 @@ export async function regenerateGroupSchedulesAction(groupId: string) {
 
   revalidatePath('/', 'layout');
   return {success: true};
+}
+
+export async function markGroupSchedulesPaidAction(
+  groupId: string,
+  expectedDate: string
+) {
+  const supabase = createClient();
+  if (!groupId) {
+    return {error: 'Group is required.'};
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedDate)) {
+    return {error: 'Invalid date format.'};
+  }
+
+  const {data: schedules, error} = await supabase
+    .from('loan_schedules')
+    .select(
+      'id,loan_id,week_number,expected_amount,paid_amount,status,loans!inner(id,group_id,outstanding_balance,status)'
+    )
+    .eq('expected_date', expectedDate)
+    .eq('loans.group_id', groupId);
+
+  if (error || !schedules) {
+    return {error: error?.message || 'Failed to load schedules'};
+  }
+
+  let updated = 0;
+  let skippedPaid = 0;
+  let skippedPrev = 0;
+  let skippedInactive = 0;
+  const errors: string[] = [];
+
+  const pickSingle = <T,>(value: T | T[] | null | undefined): T | null =>
+    Array.isArray(value) ? (value[0] ?? null) : value ?? null;
+
+  for (const row of schedules as Array<{
+    id: string;
+    loan_id: string;
+    week_number: number;
+    expected_amount: number;
+    paid_amount: number | null;
+    status: string;
+    loans:
+      | {id: string; group_id: string; outstanding_balance: number; status: string}
+      | {id: string; group_id: string; outstanding_balance: number; status: string}[]
+      | null;
+  }>) {
+    const loanRow = pickSingle(row.loans);
+    if (!loanRow || loanRow.status !== 'active') {
+      skippedInactive += 1;
+      continue;
+    }
+    if (row.status === 'paid') {
+      skippedPaid += 1;
+      continue;
+    }
+
+    const {data: previous, error: prevError} = await supabase
+      .from('loan_schedules')
+      .select('id,status')
+      .eq('loan_id', row.loan_id)
+      .lt('week_number', row.week_number)
+      .order('week_number', {ascending: false})
+      .limit(1)
+      .maybeSingle();
+
+    if (prevError) {
+      errors.push(prevError.message);
+      continue;
+    }
+
+    if (previous && previous.status !== 'paid') {
+      skippedPrev += 1;
+      continue;
+    }
+
+    const expectedAmount = Number(row.expected_amount ?? 0);
+    const oldPaid = Number(row.paid_amount ?? 0);
+    const newPaidAmount = expectedAmount;
+
+    const {error: updateError} = await supabase
+      .from('loan_schedules')
+      .update({status: 'paid', paid_amount: newPaidAmount})
+      .eq('id', row.id);
+
+    if (updateError) {
+      errors.push(updateError.message);
+      continue;
+    }
+
+    const delta = newPaidAmount - oldPaid;
+    if (delta !== 0) {
+      const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
+      const newOutstanding = currentOutstanding - delta;
+      const {error: updateLoanError} = await supabase
+        .from('loans')
+        .update({outstanding_balance: newOutstanding})
+        .eq('id', row.loan_id);
+
+      if (updateLoanError) {
+        errors.push(updateLoanError.message);
+        continue;
+      }
+    }
+
+    updated += 1;
+  }
+
+  revalidatePath('/', 'layout');
+  return {
+    success: true,
+    updated,
+    skippedPaid,
+    skippedPrev,
+    skippedInactive,
+    errors
+  };
 }

@@ -1,14 +1,19 @@
 'use client';
 
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {ArrowLeft, Download, Plus, Printer, Trash2} from 'lucide-react';
 import {useRouter} from '@/lib/navigation';
 import type {GroupDetail, GroupMemberDetail} from '@/lib/data';
 import type {LoanRecord} from '@/types';
 import {LoanTable} from './loan-table';
 import {GroupLoanFormDialog} from './group-loan-form-dialog';
-import {getLoanSchedulesAction} from '@/lib/actions/loan-schedules';
+import {
+  getLoanSchedulesAction,
+  markGroupSchedulesPaidAction,
+  regenerateGroupSchedulesAction
+} from '@/lib/actions/loan-schedules';
 import {useProfile} from '@/lib/hooks/use-profile';
+import {addDaysToDateOnly, formatDateOnlyFromUtc, toUtcDate} from '@/lib/date-only';
 
 type Props = {
   group: GroupDetail;
@@ -44,6 +49,13 @@ export function GroupMembersModule({group, loans}: Props) {
   );
   const [printLoading, setPrintLoading] = useState(false);
   const [printMonth, setPrintMonth] = useState('');
+  const [regenLoading, setRegenLoading] = useState(false);
+  const [regenError, setRegenError] = useState('');
+  const [autoFixDone, setAutoFixDone] = useState(false);
+  const [bulkDate, setBulkDate] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState('');
+  const [bulkError, setBulkError] = useState('');
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -211,21 +223,13 @@ export function GroupMembersModule({group, loans}: Props) {
   const formatNumber = (value: number) =>
     new Intl.NumberFormat('en-US', {maximumFractionDigits: 0}).format(value);
 
-  const addDaysToIso = (isoDate: string, days: number) => {
-    const base = new Date(isoDate);
-    if (Number.isNaN(base.getTime())) {
-      return '';
-    }
-    base.setDate(base.getDate() + days);
-    return base.toISOString().split('T')[0];
-  };
-
   const getLoanStartDate = (loan: LoanRecord) =>
     loan.returnStartDate ??
-    addDaysToIso(
+    addDaysToDateOnly(
       loan.disbursementDate,
       loan.repaymentFrequency === 'daily' ? 1 : 7
-    );
+    ) ??
+    '';
 
   const getExpectedAmount = (
     loan: LoanRecord,
@@ -263,11 +267,15 @@ export function GroupMembersModule({group, loans}: Props) {
     if (!value || value.startsWith('Week')) {
       return value;
     }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
+    const date = toUtcDate(value);
+    if (!date || Number.isNaN(date.getTime())) {
       return value;
     }
-    return date.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit'});
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      timeZone: 'UTC'
+    });
   };
 
   const buildMonthlyWeeklyDates = (monthValue: string, startDateValue: string) => {
@@ -275,19 +283,19 @@ export function GroupMembersModule({group, loans}: Props) {
     if (!year || !month || !startDateValue) {
       return [];
     }
-    const start = new Date(startDateValue);
-    if (Number.isNaN(start.getTime())) {
+    const start = toUtcDate(startDateValue);
+    if (!start || Number.isNaN(start.getTime())) {
       return [];
     }
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const monthEnd = new Date(Date.UTC(year, month, 0));
     const dates: Date[] = [];
 
     const forward: Date[] = [];
     for (let i = 0; i < 4; i += 1) {
       const d = new Date(start);
-      d.setDate(d.getDate() + i * 7);
-      if (d >= monthStart && d <= monthEnd) {
+      d.setUTCDate(d.getUTCDate() + i * 7);
+      if (d.getTime() >= monthStart.getTime() && d.getTime() <= monthEnd.getTime()) {
         forward.push(d);
       }
     }
@@ -296,8 +304,8 @@ export function GroupMembersModule({group, loans}: Props) {
     let step = 1;
     while (forward.length + backward.length < 4) {
       const d = new Date(start);
-      d.setDate(d.getDate() - step * 7);
-      if (d >= monthStart && d <= monthEnd) {
+      d.setUTCDate(d.getUTCDate() - step * 7);
+      if (d.getTime() >= monthStart.getTime() && d.getTime() <= monthEnd.getTime()) {
         backward.push(d);
       } else {
         break;
@@ -307,8 +315,30 @@ export function GroupMembersModule({group, loans}: Props) {
 
     dates.push(...backward.reverse(), ...forward);
     return dates
-      .filter((d) => d >= monthStart && d <= monthEnd)
-      .map((d) => d.toISOString().split('T')[0]);
+      .filter(
+        (d) => d.getTime() >= monthStart.getTime() && d.getTime() <= monthEnd.getTime()
+      )
+      .map((d) => formatDateOnlyFromUtc(d));
+  };
+
+  const buildMonthlyDatesFromSchedules = (
+    monthValue: string,
+    schedulesMap: Map<string, Map<string, any>>
+  ) => {
+    if (!monthValue || schedulesMap.size === 0) {
+      return [];
+    }
+    const prefix = `${monthValue}-`;
+    const dates = new Set<string>();
+    schedulesMap.forEach((loanMap) => {
+      loanMap?.forEach((row, dateKey) => {
+        const date = row?.expected_date ?? row?.expectedDate ?? dateKey;
+        if (typeof date === 'string' && date.startsWith(prefix)) {
+          dates.add(date);
+        }
+      });
+    });
+    return Array.from(dates).sort().slice(0, 4);
   };
 
   const groupStartDate = useMemo(() => {
@@ -319,10 +349,13 @@ export function GroupMembersModule({group, loans}: Props) {
     return dates[0] ?? '';
   }, [loans]);
 
-  const printDates = useMemo(
-    () => buildMonthlyWeeklyDates(exportMonth, groupStartDate),
-    [exportMonth, groupStartDate]
-  );
+  const printDates = useMemo(() => {
+    const scheduleDates = buildMonthlyDatesFromSchedules(exportMonth, printSchedules);
+    if (scheduleDates.length > 0) {
+      return scheduleDates;
+    }
+    return buildMonthlyWeeklyDates(exportMonth, groupStartDate);
+  }, [exportMonth, groupStartDate, printSchedules]);
 
   const loadPrintData = async (monthValue: string, force = false) => {
     if (printLoading) {
@@ -358,6 +391,62 @@ export function GroupMembersModule({group, loans}: Props) {
       schedules: loanScheduleMaps
     };
   };
+
+  const regenerateGroupSchedules = async () => {
+    if (regenLoading) {
+      return;
+    }
+    setRegenLoading(true);
+    setRegenError('');
+    const result = await regenerateGroupSchedulesAction(group.id);
+    if (result?.error) {
+      setRegenError(result.error);
+    }
+    setPrintSchedules(new Map());
+    setPrintMonth('');
+    await loadPrintData(exportMonth, true);
+    setRegenLoading(false);
+    router.refresh();
+  };
+
+  const markGroupPaidForDate = async () => {
+    if (!bulkDate || bulkLoading) {
+      return;
+    }
+    setBulkLoading(true);
+    setBulkError('');
+    setBulkMessage('');
+    const result = await markGroupSchedulesPaidAction(group.id, bulkDate);
+    if (result?.error) {
+      setBulkError(result.error);
+    } else if (result?.success) {
+      const details = [
+        `Updated ${result.updated ?? 0}`,
+        `Already paid ${result.skippedPaid ?? 0}`,
+        `Previous unpaid ${result.skippedPrev ?? 0}`,
+        `Inactive ${result.skippedInactive ?? 0}`
+      ].join(' • ');
+      setBulkMessage(details);
+      if (result.errors?.length) {
+        setBulkError(result.errors.slice(0, 2).join(', '));
+      }
+      setPrintSchedules(new Map());
+      setPrintMonth('');
+      await loadPrintData(exportMonth, true);
+      router.refresh();
+    }
+    setBulkLoading(false);
+  };
+
+  useEffect(() => {
+    if (view !== 'loans' || autoFixDone || loans.length === 0) {
+      return;
+    }
+    void (async () => {
+      await regenerateGroupSchedules();
+      setAutoFixDone(true);
+    })();
+  }, [view, autoFixDone, loans.length, exportMonth]);
 
   const exportGroupLoansPdf = async () => {
     if (loans.length === 0) {
@@ -689,6 +778,21 @@ export function GroupMembersModule({group, loans}: Props) {
           <div className="no-print mb-2 flex flex-wrap items-center justify-between gap-2">
             <GroupLoanFormDialog groupId={group.id} members={group.members} />
             <div className="flex flex-wrap items-center gap-2">
+              {regenError ? (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {regenError}
+                </p>
+              ) : null}
+              {bulkError ? (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {bulkError}
+                </p>
+              ) : null}
+              {bulkMessage ? (
+                <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  {bulkMessage}
+                </p>
+              ) : null}
               <input
                 type="month"
                 className="rounded-lg border bg-background px-3 py-2 text-sm"
@@ -725,6 +829,28 @@ export function GroupMembersModule({group, loans}: Props) {
               >
                 <Download size={16} /> Download PDF
               </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="rounded-lg border bg-background px-3 py-2 text-sm"
+                  value={bulkDate}
+                  onChange={(e) => setBulkDate(e.target.value)}
+                  disabled={profile?.role && profile.role !== 'admin'}
+                />
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+                  onClick={() => void markGroupPaidForDate()}
+                  disabled={
+                    !bulkDate ||
+                    bulkLoading ||
+                    loans.length === 0 ||
+                    (profile?.role && profile.role !== 'admin')
+                  }
+                >
+                  {bulkLoading ? 'Marking...' : 'Mark Paid (All)'}
+                </button>
+              </div>
             </div>
           </div>
           <div className="no-print rounded-xl border bg-card p-3">

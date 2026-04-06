@@ -281,8 +281,9 @@ export function LoanForm({loanType, onClose}: Props) {
         <input type="hidden" name="repaymentFrequency" value="weekly" />
       )}
       <input
-        required
+        required={loanType === 'vyombo_moto'}
         type="number"
+        min={1}
         className="rounded-lg border bg-background px-3 py-2 text-sm"
         placeholder={repaymentFrequency === 'daily' ? 'Duration (Days)' : 'Duration (Weeks)'}
         name="durationWeeks"

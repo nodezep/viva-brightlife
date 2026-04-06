@@ -9,6 +9,7 @@ import {LoanSchedulesDialog} from './loan-schedules-dialog';
 import {LoanEditForm} from './loan-edit-form';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 import {useProfile} from '@/lib/hooks/use-profile';
+import {addMonthsToDateOnly} from '@/lib/date-only';
 
 type Props = {
   loanType: LoanType;
@@ -33,18 +34,31 @@ export function LoanTable({loanType, rows, count}: Props) {
   const {profile} = useProfile();
   const [permissionError, setPermissionError] = useState('');
 
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.disbursed += Number(row.disbursementAmount || 0);
+      acc.interest += Number(row.securityAmount || 0);
+      acc.installment += Number(row.installmentSize || 0);
+      acc.balance += Number(row.outstandingBalance || 0);
+      acc.overdue += Number(row.overdueAmount || 0);
+      acc.paid += Number(row.amountPaid || 0);
+      return acc;
+    },
+    {
+      disbursed: 0,
+      interest: 0,
+      installment: 0,
+      balance: 0,
+      overdue: 0,
+      paid: 0
+    }
+  );
+
   const addMonthsToIso = (isoDate: string, months: number) => {
-    const base = new Date(isoDate);
-    if (Number.isNaN(base.getTime()) || months <= 0) {
+    if (months <= 0) {
       return '-';
     }
-    const d = new Date(base);
-    const day = d.getDate();
-    d.setMonth(d.getMonth() + months);
-    if (d.getDate() < day) {
-      d.setDate(0);
-    }
-    return d.toISOString().split('T')[0];
+    return addMonthsToDateOnly(isoDate, months) ?? '-';
   };
   
 
@@ -395,6 +409,27 @@ export function LoanTable({loanType, rows, count}: Props) {
                 </tr>
               ) : null}
             </tbody>
+            {rows.length > 0 ? (
+              <tfoot className="bg-muted/50 font-semibold">
+                <tr>
+                  <td className="px-3 py-2">TOTAL</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2">{currency.format(totals.disbursed)}</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2">{currency.format(totals.interest)}</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2">{currency.format(totals.paid)}</td>
+                  <td className="px-3 py-2">{currency.format(totals.installment)}</td>
+                  <td className="px-3 py-2">{currency.format(totals.balance)}</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2 no-print"></td>
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
           </>
         ) : (
@@ -572,6 +607,32 @@ export function LoanTable({loanType, rows, count}: Props) {
                 </tr>
               ) : null}
             </tbody>
+            {rows.length > 0 ? (
+              <tfoot className="bg-muted/50 font-semibold">
+                <tr>
+                  <td className="px-3 py-2">TOTAL</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2 hidden lg:table-cell"></td>
+                  <td className="px-3 py-2 hidden lg:table-cell">
+                    {currency.format(totals.interest)}
+                  </td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2">{currency.format(totals.disbursed)}</td>
+                  <td className="px-3 py-2 hidden md:table-cell"></td>
+                  <td className="px-3 py-2 hidden lg:table-cell">
+                    {currency.format(totals.installment)}
+                  </td>
+                  <td className="px-3 py-2">{currency.format(totals.balance)}</td>
+                  <td className="px-3 py-2 hidden md:table-cell">
+                    {currency.format(totals.overdue)}
+                  </td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2 hidden md:table-cell"></td>
+                  <td className="px-3 py-2 no-print"></td>
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
           </>
         )}

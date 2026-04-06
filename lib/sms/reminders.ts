@@ -1,5 +1,6 @@
 import {createAdminClient} from '@/lib/supabase/admin';
 import {sendSms} from './provider';
+import {addDaysToDateOnly} from '@/lib/date-only';
 
 type ReminderRule = {
   id: string;
@@ -84,12 +85,7 @@ function getTodayIsoLocal() {
 }
 
 function addDaysToIso(isoDate: string, days: number) {
-  const base = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(base.getTime())) {
-    return isoDate;
-  }
-  base.setDate(base.getDate() + days);
-  return base.toISOString().split('T')[0];
+  return addDaysToDateOnly(isoDate, days) ?? isoDate;
 }
 
 function diffDays(isoFrom: string, isoTo: string) {

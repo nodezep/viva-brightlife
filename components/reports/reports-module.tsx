@@ -59,6 +59,14 @@ const formatMonthLabel = (monthKey: string) => {
   });
 };
 
+const getTodayIsoLocal = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export function ReportsModule({initialRows, marejeshoRows}: Props) {
   const t = useTranslations();
   const [loanType, setLoanType] = useState('all');
@@ -149,6 +157,85 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
     };
   }, [filteredMarejesho, startDate, endDate]);
 
+  const monthlySchedule = useMemo(() => {
+    const buckets = new Map<
+      string,
+      {
+        expected: number;
+        paid: number;
+        overdueAmount: number;
+        dueCount: number;
+        paidCount: number;
+      }
+    >();
+    const todayStr = getTodayIsoLocal();
+
+    filteredMarejesho.forEach((loan) => {
+      loan.schedules.forEach((schedule) => {
+        if (startDate && schedule.expectedDate < startDate) return;
+        if (endDate && schedule.expectedDate > endDate) return;
+        const monthKey = schedule.expectedDate.slice(0, 7);
+        const bucket =
+          buckets.get(monthKey) ?? {
+            expected: 0,
+            paid: 0,
+            overdueAmount: 0,
+            dueCount: 0,
+            paidCount: 0
+          };
+        const expected = Number(schedule.expectedAmount ?? 0);
+        const paid = Number(schedule.paidAmount ?? 0);
+        bucket.expected += expected;
+        bucket.paid += paid;
+        bucket.dueCount += 1;
+        if (paid >= expected && expected > 0) {
+          bucket.paidCount += 1;
+        }
+        if (schedule.expectedDate < todayStr && paid < expected) {
+          bucket.overdueAmount += Math.max(expected - paid, 0);
+        }
+        buckets.set(monthKey, bucket);
+      });
+    });
+
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, bucket]) => ({
+        month,
+        label: formatMonthLabel(month),
+        expected: bucket.expected,
+        paid: bucket.paid,
+        gap: Math.max(bucket.expected - bucket.paid, 0),
+        overdueAmount: bucket.overdueAmount,
+        dueCount: bucket.dueCount,
+        paidCount: bucket.paidCount,
+        collectionRate:
+          bucket.expected > 0 ? (bucket.paid / bucket.expected) * 100 : 0
+      }));
+  }, [filteredMarejesho, startDate, endDate]);
+
+  const monthlyTotals = useMemo(() => {
+    return monthlySchedule.reduce(
+      (acc, row) => {
+        acc.expected += row.expected;
+        acc.paid += row.paid;
+        acc.gap += row.gap;
+        acc.overdueAmount += row.overdueAmount;
+        acc.dueCount += row.dueCount;
+        acc.paidCount += row.paidCount;
+        return acc;
+      },
+      {
+        expected: 0,
+        paid: 0,
+        gap: 0,
+        overdueAmount: 0,
+        dueCount: 0,
+        paidCount: 0
+      }
+    );
+  }, [monthlySchedule]);
+
   const statusBreakdown = useMemo(() => {
     const counts: Record<string, BreakdownItem> = {
       active: {...statusPalette.active},
@@ -235,6 +322,10 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
     summarySheet.addRow({metric: 'Schedule Expected', value: scheduleSummary.expected});
     summarySheet.addRow({metric: 'Schedule Paid', value: scheduleSummary.paid});
     summarySheet.addRow({metric: 'Schedule Gap', value: scheduleSummary.gap});
+    summarySheet.addRow({metric: 'Monthly Expected', value: monthlyTotals.expected});
+    summarySheet.addRow({metric: 'Monthly Paid', value: monthlyTotals.paid});
+    summarySheet.addRow({metric: 'Monthly Gap', value: monthlyTotals.gap});
+    summarySheet.addRow({metric: 'Monthly Overdue', value: monthlyTotals.overdueAmount});
 
     summarySheet.getRow(1).font = {bold: true};
     summarySheet.getColumn('value').numFmt = '#,##0';
@@ -310,6 +401,37 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
       }
     });
 
+    const monthlySheet = workbook.addWorksheet('Monthly Collections');
+    monthlySheet.columns = [
+      {header: 'Month', key: 'month', width: 14},
+      {header: 'Expected', key: 'expected', width: 16},
+      {header: 'Paid', key: 'paid', width: 16},
+      {header: 'Gap', key: 'gap', width: 16},
+      {header: 'Overdue Amount', key: 'overdue', width: 18},
+      {header: 'Due Count', key: 'dueCount', width: 12},
+      {header: 'Paid Count', key: 'paidCount', width: 12},
+      {header: 'Collection %', key: 'rate', width: 14}
+    ];
+
+    monthlySchedule.forEach((row) => {
+      monthlySheet.addRow({
+        month: row.label,
+        expected: row.expected,
+        paid: row.paid,
+        gap: row.gap,
+        overdue: row.overdueAmount,
+        dueCount: row.dueCount,
+        paidCount: row.paidCount,
+        rate: row.collectionRate / 100
+      });
+    });
+    monthlySheet.getRow(1).font = {bold: true};
+    monthlySheet.getColumn('expected').numFmt = '#,##0';
+    monthlySheet.getColumn('paid').numFmt = '#,##0';
+    monthlySheet.getColumn('gap').numFmt = '#,##0';
+    monthlySheet.getColumn('overdue').numFmt = '#,##0';
+    monthlySheet.getColumn('rate').numFmt = '0.00%';
+
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -340,6 +462,7 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
     doc.text(t(`reports.${reportType}`), 14, 22);
     doc.text(`${startDate || 'All'} to ${endDate || 'All'}`, 14, 27);
 
+    const isMonthly = reportType === 'monthly_collection';
     const headers = isMarejesho
       ? [
           'Member',
@@ -350,7 +473,18 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
           'OS Balance',
           ...scheduleDates
         ]
-      : ['Member', 'Loan Number', 'Type', 'Amount', 'OS Balance', 'Status'];
+      : isMonthly
+        ? [
+            'Month',
+            'Expected',
+            'Paid',
+            'Gap',
+            'Overdue Amount',
+            'Due Count',
+            'Paid Count',
+            'Collection %'
+          ]
+        : ['Member', 'Loan Number', 'Type', 'Amount', 'OS Balance', 'Status'];
 
     const body = isMarejesho
       ? filteredMarejesho.map((row) => {
@@ -373,14 +507,25 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
             ...scheduleCells
           ];
         })
-      : rows.map((row) => [
-          row.memberName,
-          row.loanNumber,
-          row.loanType,
-          formatNumber(row.disbursementAmount),
-          formatNumber(row.outstandingBalance),
-          row.status
-        ]);
+      : isMonthly
+        ? monthlySchedule.map((row) => [
+            row.label,
+            formatNumber(row.expected),
+            formatNumber(row.paid),
+            formatNumber(row.gap),
+            formatNumber(row.overdueAmount),
+            formatNumber(row.dueCount),
+            formatNumber(row.paidCount),
+            `${row.collectionRate.toFixed(1)}%`
+          ])
+        : rows.map((row) => [
+            row.memberName,
+            row.loanNumber,
+            row.loanType,
+            formatNumber(row.disbursementAmount),
+            formatNumber(row.outstandingBalance),
+            row.status
+          ]);
 
     autoTable(doc, {
       head: [headers],
@@ -532,6 +677,84 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
         </div>
       </div>
 
+      <div className="rounded-2xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Monthly Collections
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-foreground font-[family:Georgia,serif]">
+              Expected vs Paid + Delays
+            </h3>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Collection rate{' '}
+            {monthlyTotals.expected > 0
+              ? `${((monthlyTotals.paid / monthlyTotals.expected) * 100).toFixed(1)}%`
+              : '0.0%'}
+          </span>
+        </div>
+        <div className="mt-4 overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/70 text-left">
+              <tr>
+                <th className="px-3 py-2">Month</th>
+                <th className="px-3 py-2">Expected</th>
+                <th className="px-3 py-2">Paid</th>
+                <th className="px-3 py-2">Gap</th>
+                <th className="px-3 py-2">Overdue</th>
+                <th className="px-3 py-2">Due</th>
+                <th className="px-3 py-2">Paid</th>
+                <th className="px-3 py-2">Collection %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlySchedule.length === 0 ? (
+                <tr>
+                  <td
+                    className="px-3 py-6 text-center text-muted-foreground"
+                    colSpan={8}
+                  >
+                    No schedule data for the selected range.
+                  </td>
+                </tr>
+              ) : (
+                monthlySchedule.map((row) => (
+                  <tr key={row.month} className="border-t">
+                    <td className="px-3 py-2">{row.label}</td>
+                    <td className="px-3 py-2">{formatNumber(row.expected)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.paid)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.gap)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.overdueAmount)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.dueCount)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.paidCount)}</td>
+                    <td className="px-3 py-2">
+                      {row.collectionRate.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))
+              )}
+              {monthlySchedule.length > 0 ? (
+                <tr className="border-t font-semibold">
+                  <td className="px-3 py-2">TOTAL</td>
+                  <td className="px-3 py-2">{formatNumber(monthlyTotals.expected)}</td>
+                  <td className="px-3 py-2">{formatNumber(monthlyTotals.paid)}</td>
+                  <td className="px-3 py-2">{formatNumber(monthlyTotals.gap)}</td>
+                  <td className="px-3 py-2">{formatNumber(monthlyTotals.overdueAmount)}</td>
+                  <td className="px-3 py-2">{formatNumber(monthlyTotals.dueCount)}</td>
+                  <td className="px-3 py-2">{formatNumber(monthlyTotals.paidCount)}</td>
+                  <td className="px-3 py-2">
+                    {monthlyTotals.expected > 0
+                      ? `${((monthlyTotals.paid / monthlyTotals.expected) * 100).toFixed(1)}%`
+                      : '0.0%'}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border bg-card p-4 shadow-sm md:col-span-2">
           <div className="flex items-center justify-between">
@@ -662,7 +885,56 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
             {startDate || 'All'} to {endDate || 'All'}
           </p>
         </div>
-        {reportType === 'marejesho_sheet' ? (
+        {reportType === 'monthly_collection' ? (
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/70 text-left">
+                <tr>
+                  <th className="px-3 py-2">Month</th>
+                  <th className="px-3 py-2">Expected</th>
+                  <th className="px-3 py-2">Paid</th>
+                  <th className="px-3 py-2">Gap</th>
+                  <th className="px-3 py-2">Overdue</th>
+                  <th className="px-3 py-2">Due</th>
+                  <th className="px-3 py-2">Paid</th>
+                  <th className="px-3 py-2">Collection %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlySchedule.map((row) => (
+                  <tr key={row.month} className="border-t">
+                    <td className="px-3 py-2">{row.label}</td>
+                    <td className="px-3 py-2">{formatNumber(row.expected)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.paid)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.gap)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.overdueAmount)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.dueCount)}</td>
+                    <td className="px-3 py-2">{formatNumber(row.paidCount)}</td>
+                    <td className="px-3 py-2">
+                      {row.collectionRate.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+                {monthlySchedule.length > 0 ? (
+                  <tr className="border-t font-semibold">
+                    <td className="px-3 py-2">TOTAL</td>
+                    <td className="px-3 py-2">{formatNumber(monthlyTotals.expected)}</td>
+                    <td className="px-3 py-2">{formatNumber(monthlyTotals.paid)}</td>
+                    <td className="px-3 py-2">{formatNumber(monthlyTotals.gap)}</td>
+                    <td className="px-3 py-2">{formatNumber(monthlyTotals.overdueAmount)}</td>
+                    <td className="px-3 py-2">{formatNumber(monthlyTotals.dueCount)}</td>
+                    <td className="px-3 py-2">{formatNumber(monthlyTotals.paidCount)}</td>
+                    <td className="px-3 py-2">
+                      {monthlyTotals.expected > 0
+                        ? `${((monthlyTotals.paid / monthlyTotals.expected) * 100).toFixed(1)}%`
+                        : '0.0%'}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : reportType === 'marejesho_sheet' ? (
           <div className="overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/70 text-left">

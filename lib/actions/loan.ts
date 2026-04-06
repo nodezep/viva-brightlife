@@ -2,20 +2,18 @@
 
 import {createClient} from '@/lib/supabase/server';
 import {revalidatePath} from 'next/cache';
-
-const addDaysToIso = (isoDate: string, days: number) => {
-  const base = new Date(isoDate);
-  if (Number.isNaN(base.getTime())) {
-    return null;
-  }
-  base.setDate(base.getDate() + days);
-  return base.toISOString().split('T')[0];
-};
+import {
+  addDaysToDateOnly,
+  addMonthsToDateOnly,
+  formatDateOnlyFromUtc,
+  toUtcDate
+} from '@/lib/date-only';
 
 const getDefaultReturnStartDate = (
   disbursementDate: string,
   repaymentFrequency: string
-) => addDaysToIso(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
+) =>
+  addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
 
 export async function createLoanAction(formData: FormData) {
   const supabase = createClient();
@@ -45,6 +43,17 @@ export async function createLoanAction(formData: FormData) {
       ? 1
       : Number(durationWeeksRaw);
   const durationMonths = Number(formData.get('durationMonths') || 0);
+
+  if (loanType === 'vyombo_moto') {
+    if (durationWeeksRaw === null || durationWeeksRaw === '' || durationWeeks <= 0) {
+      return {
+        error:
+          repaymentFrequency === 'daily'
+            ? 'Please enter duration in days for vehicle loans.'
+            : 'Please enter duration in weeks for vehicle loans.'
+      };
+    }
+  }
 
   let interestRatePercent = interestRate;
   if (loanType === 'binafsi') {
@@ -184,12 +193,17 @@ export async function createLoanAction(formData: FormData) {
       returnStartDateRaw && returnStartDateRaw.trim()
         ? returnStartDateRaw
         : defaultReturnStart || disbursementDate;
-    let currentDate = new Date(startDate);
+    const start = toUtcDate(startDate) ?? toUtcDate(disbursementDate);
+    if (!start) {
+      revalidatePath('/', 'layout');
+      return { success: true };
+    }
+    let currentDate = new Date(start);
     const isDaily = repaymentFrequency === 'daily';
 
     for (let i = 1; i <= durationWeeks; i++) {
       if (i > 1) {
-        currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
+        currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
       }
       
       const isLastWeek = i === durationWeeks;
@@ -204,7 +218,7 @@ export async function createLoanAction(formData: FormData) {
       schedules.push({
         loan_id: loanId,
         week_number: i,
-        expected_date: currentDate.toISOString().split('T')[0],
+        expected_date: formatDateOnlyFromUtc(currentDate),
         expected_amount: expectedAmount,
         status: 'pending'
       });
@@ -219,23 +233,14 @@ export async function createLoanAction(formData: FormData) {
   } else if (loanType === 'binafsi' && durationMonths > 0) {
     // Generate monthly schedules - one entry per month
     const schedules = [];
-    const addMonths = (date: Date, months: number) => {
-      const d = new Date(date);
-      const day = d.getDate();
-      d.setMonth(d.getMonth() + months);
-      if (d.getDate() < day) {
-        d.setDate(0);
-      }
-      return d;
-    };
-
     // Calculate monthly installment (total repayment divided by months)
     const monthlyInstallment = installmentSize / durationMonths;
 
     for (let month = 1; month <= durationMonths; month++) {
-      const expectedDate = addMonths(new Date(disbursementDate), month)
-        .toISOString()
-        .split('T')[0];
+      const expectedDate = addMonthsToDateOnly(disbursementDate, month);
+      if (!expectedDate) {
+        continue;
+      }
 
       schedules.push({
         loan_id: loanId,
@@ -310,6 +315,17 @@ export async function updateLoanAction(formData: FormData) {
 
   const memberId = loanRow.member_id as string;
   const loanType = loanRow.loan_type as string;
+
+  if (loanType === 'vyombo_moto') {
+    if (durationWeeksRaw === null || durationWeeksRaw === '' || durationWeeks <= 0) {
+      return {
+        error:
+          repaymentFrequency === 'daily'
+            ? 'Please enter duration in days for vehicle loans.'
+            : 'Please enter duration in weeks for vehicle loans.'
+      };
+    }
+  }
 
   let interestRatePercent = interestRate;
   if (loanType === 'binafsi') {
@@ -393,12 +409,17 @@ export async function updateLoanAction(formData: FormData) {
       returnStartDateRaw && returnStartDateRaw.trim()
         ? returnStartDateRaw
         : defaultReturnStart || disbursementDate;
-    let currentDate = new Date(startDate);
+    const start = toUtcDate(startDate) ?? toUtcDate(disbursementDate);
+    if (!start) {
+      revalidatePath('/', 'layout');
+      return {success: true};
+    }
+    let currentDate = new Date(start);
     const isDaily = repaymentFrequency === 'daily';
 
     for (let i = 1; i <= durationWeeksValue; i++) {
       if (i > 1) {
-        currentDate.setDate(currentDate.getDate() + (isDaily ? 1 : 7));
+        currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
       }
       const isLastWeek = i === durationWeeksValue;
       let expectedAmount = isLastWeek
@@ -409,7 +430,7 @@ export async function updateLoanAction(formData: FormData) {
       schedules.push({
         loan_id: loanId,
         week_number: i,
-        expected_date: currentDate.toISOString().split('T')[0],
+        expected_date: formatDateOnlyFromUtc(currentDate),
         expected_amount: expectedAmount,
         status: 'pending'
       });
@@ -435,23 +456,14 @@ export async function updateLoanAction(formData: FormData) {
 
     // Generate monthly schedules - one entry per month
     const schedules = [];
-    const addMonths = (date: Date, months: number) => {
-      const d = new Date(date);
-      const day = d.getDate();
-      d.setMonth(d.getMonth() + months);
-      if (d.getDate() < day) {
-        d.setDate(0);
-      }
-      return d;
-    };
-
     // Calculate monthly installment (total repayment divided by months)
     const monthlyInstallment = installmentSize / durationMonths;
 
     for (let month = 1; month <= durationMonths; month++) {
-      const expectedDate = addMonths(new Date(disbursementDate), month)
-        .toISOString()
-        .split('T')[0];
+      const expectedDate = addMonthsToDateOnly(disbursementDate, month);
+      if (!expectedDate) {
+        continue;
+      }
 
       schedules.push({
         loan_id: loanId,

@@ -1,5 +1,6 @@
 import {createClient} from '@/lib/supabase/server';
 import type {LoanRecord, LoanType} from '@/types';
+import {addMonthsToDateOnly} from '@/lib/date-only';
 
 type LoanRow = {
   id: string;
@@ -46,17 +47,10 @@ function getTodayIsoLocal(): string {
 }
 
 function addMonthsToIso(isoDate: string, months: number): string | null {
-  const base = new Date(isoDate);
-  if (Number.isNaN(base.getTime()) || months <= 0) {
+  if (months <= 0) {
     return null;
   }
-  const d = new Date(base);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + months);
-  if (d.getDate() < day) {
-    d.setDate(0);
-  }
-  return d.toISOString().split('T')[0];
+  return addMonthsToDateOnly(isoDate, months);
 }
 
 function diffDays(isoFrom: string, isoTo: string): number {
