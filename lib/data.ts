@@ -6,6 +6,7 @@ type LoanRow = {
   id: string;
   loan_number: string;
   loan_type: LoanType;
+  item_description?: string | null;
   cycle_count: number;
   security_amount: number;
   principal_amount: number;
@@ -13,7 +14,7 @@ type LoanRow = {
   weekly_installment: number;
   outstanding_balance: number;
   overdue_amount: number;
-  repayment_frequency?: 'weekly' | 'daily' | null;
+  repayment_frequency?: 'weekly' | 'daily' | 'monthly' | null;
   duration_months?: number | null;
   amount_withdrawn?: number | null;
   interest_rate?: number | null;
@@ -21,8 +22,8 @@ type LoanRow = {
   return_start_date?: string | null;
   status: 'active' | 'closed' | 'defaulted' | 'pending';
   members:
-    | {member_number: string; full_name: string; phone: string | null}
-    | {member_number: string; full_name: string; phone: string | null}[]
+    | {id: string; member_number: string; full_name: string; phone: string | null}
+    | {id: string; member_number: string; full_name: string; phone: string | null}[]
     | null;
 };
 
@@ -124,9 +125,11 @@ function toLoanRecord(row: LoanRow): LoanRecord {
 
   return {
     id: row.id,
+    memberId: member?.id ?? '',
     memberNumber: member?.member_number ?? '-',
     memberName: member?.full_name ?? '-',
     memberPhone: member?.phone ?? null,
+    itemDescription: row.item_description ?? null,
     cycle: row.cycle_count,
     securityAmount: Number(row.security_amount ?? 0),
     loanNumber: row.loan_number,
@@ -137,7 +140,10 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     overdueAmount: Number(row.overdue_amount ?? 0),
     status: row.status,
     loanType: row.loan_type,
-    repaymentFrequency: (row.repayment_frequency ?? 'weekly') as 'weekly' | 'daily',
+    repaymentFrequency: (row.repayment_frequency ?? 'weekly') as
+      | 'weekly'
+      | 'daily'
+      | 'monthly',
     durationMonths: Number(row.duration_months ?? 0) || 0,
     amountPaid: Number(row.amount_withdrawn ?? 0),
     interestRate: Number(row.interest_rate ?? 0),
@@ -148,13 +154,13 @@ function toLoanRecord(row: LoanRow): LoanRecord {
 
 const loanSelectFields = (includeReturnStart: boolean) =>
   includeReturnStart
-    ? 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,return_start_date,status,members!inner(member_number,full_name,phone)'
-    : 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(member_number,full_name,phone)';
+    ? 'id,loan_number,loan_type,item_description,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,return_start_date,status,members!inner(id,member_number,full_name,phone)'
+    : 'id,loan_number,loan_type,item_description,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members!inner(id,member_number,full_name,phone)';
 
 const loanSelectFieldsOuter = (includeReturnStart: boolean) =>
   includeReturnStart
-    ? 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,return_start_date,status,members(member_number,full_name,phone)'
-    : 'id,loan_number,loan_type,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(member_number,full_name,phone)';
+    ? 'id,loan_number,loan_type,item_description,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,return_start_date,status,members(id,member_number,full_name,phone)'
+    : 'id,loan_number,loan_type,item_description,cycle_count,security_amount,principal_amount,disbursement_date,weekly_installment,outstanding_balance,overdue_amount,repayment_frequency,duration_months,amount_withdrawn,interest_rate,days_overdue,status,members(id,member_number,full_name,phone)';
 
 export type LoanSort =
   | 'newest'

@@ -16,7 +16,7 @@ type CandidateLoan = {
   duration_months: number;
   overdue_amount: number;
   outstanding_balance: number;
-  repayment_frequency?: 'weekly' | 'daily' | null;
+  repayment_frequency?: 'weekly' | 'daily' | 'monthly' | null;
   members:
     | {id: string; full_name: string; phone: string | null}
     | {id: string; full_name: string; phone: string | null}[]
@@ -137,6 +137,26 @@ async function getPreferences(memberIds: string[]) {
   return new Map((data as PreferenceRow[]).map((row) => [row.member_id, row]));
 }
 
+async function getRecentlyMessagedMembers(memberIds: string[]) {
+  if (memberIds.length === 0) {
+    return new Set<string>();
+  }
+  const supabase = createAdminClient();
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const {data, error} = await supabase
+    .from('sms_reminders')
+    .select('member_id')
+    .in('member_id', memberIds)
+    .gte('created_at', since)
+    .in('status', ['queued', 'pending_approval', 'sent']);
+
+  if (error || !data) {
+    return new Set<string>();
+  }
+
+  return new Set((data as {member_id: string}[]).map((row) => row.member_id));
+}
+
 export async function queueOverdueReminders() {
   const supabase = createAdminClient();
 
@@ -164,12 +184,16 @@ export async function queueOverdueReminders() {
     .filter((id): id is string => Boolean(id));
 
   const preferences = await getPreferences(memberIds);
+  const recentlyMessaged = await getRecentlyMessagedMembers(memberIds);
 
   let queued = 0;
 
   for (const loan of loans) {
     const member = pickOne(loan.members);
     if (!member || !member.phone) {
+      continue;
+    }
+    if (recentlyMessaged.has(member.id)) {
       continue;
     }
     if (loan.repayment_frequency === 'daily') {
@@ -225,7 +249,7 @@ export async function queueOverdueReminders() {
           message,
           days_overdue: daysOverdue,
           scheduled_for: scheduled.toISOString(),
-          status: 'queued',
+          status: 'pending_approval',
           delivery_status: 'queued',
           provider_name: process.env.SMS_PROVIDER ?? 'mock'
         },
@@ -316,7 +340,7 @@ type UpcomingSchedule = {
         loan_number: string;
         outstanding_balance: number;
         status: string;
-        repayment_frequency?: 'weekly' | 'daily' | null;
+        repayment_frequency?: 'weekly' | 'daily' | 'monthly' | null;
         members:
           | {id: string; full_name: string; phone: string | null}
           | {id: string; full_name: string; phone: string | null}[]
@@ -360,6 +384,7 @@ export async function queueUpcomingReminders() {
     .map((row) => pickOne(pickOne(row.loans)?.members)?.id)
     .filter((id): id is string => Boolean(id));
   const preferences = await getPreferences(memberIds);
+  const recentlyMessaged = await getRecentlyMessagedMembers(memberIds);
 
   let queued = 0;
 
@@ -379,6 +404,9 @@ export async function queueUpcomingReminders() {
     }
     const member = pickOne(loan.members);
     if (!member || !member.phone) {
+      continue;
+    }
+    if (recentlyMessaged.has(member.id)) {
       continue;
     }
     const pref = preferences.get(member.id);
@@ -428,7 +456,7 @@ export async function queueUpcomingReminders() {
         message,
         days_overdue: 0,
         scheduled_for: scheduled.toISOString(),
-        status: 'queued',
+        status: 'pending_approval',
         delivery_status: 'queued',
         provider_name: process.env.SMS_PROVIDER ?? 'mock'
       },

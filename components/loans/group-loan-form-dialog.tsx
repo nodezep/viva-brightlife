@@ -15,6 +15,7 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resolvedMembers, setResolvedMembers] = useState<GroupMemberDetail[]>(members);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     setResolvedMembers(members);
@@ -124,6 +125,11 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
           Add group members first before creating a loan.
         </p>
       ) : null}
+      {successMessage ? (
+        <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {successMessage}
+        </div>
+      ) : null}
 
       {open ? (
         <div className="mb-4">
@@ -136,6 +142,10 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
               groupId={groupId}
               members={resolvedMembers}
               onClose={() => setOpen(false)}
+              onSuccess={(message) => {
+                setSuccessMessage(message);
+                setTimeout(() => setSuccessMessage(''), 4000);
+              }}
             />
           )}
         </div>

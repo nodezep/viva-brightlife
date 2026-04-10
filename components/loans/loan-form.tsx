@@ -9,9 +9,10 @@ import {useRouter} from '@/lib/navigation';
 type Props = {
   loanType: LoanType;
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 };
 
-export function LoanForm({loanType, onClose}: Props) {
+export function LoanForm({loanType, onClose, onSuccess}: Props) {
   const t = useTranslations();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -20,9 +21,10 @@ export function LoanForm({loanType, onClose}: Props) {
 
   // States for automatic calculation
   const [totalRepay, setTotalRepay] = useState('');
-  const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState('');
-  const [repaymentFrequency, setRepaymentFrequency] = useState<'weekly' | 'daily'>('weekly');
+  const [repaymentFrequency, setRepaymentFrequency] = useState<
+    'weekly' | 'daily' | 'monthly'
+  >('weekly');
 
   // Individual loan (binafsi) states
   const [principal, setPrincipal] = useState('');
@@ -44,20 +46,6 @@ export function LoanForm({loanType, onClose}: Props) {
   const [installmentDisplay, setInstallmentDisplay] = useState('');
   const [totalRepayDisplay, setTotalRepayDisplay] = useState('');
 
-  // Auto-calculate installment size based on Total Repay and Weeks
-  useEffect(() => {
-    const repayVal = Number(totalRepay);
-    const weeksVal = Number(durationWeeks);
-    if (repayVal > 0 && weeksVal > 0) {
-      const perPeriod = repayVal / weeksVal;
-      // Round to nearest 100 as per common microfinance practice
-      const suggested = Math.ceil(perPeriod / 100) * 100;
-      setInstallment(suggested.toString());
-    } else if (!repayVal || !weeksVal) {
-      setInstallment('');
-    }
-  }, [totalRepay, durationWeeks]);
-
   useEffect(() => {
     setInstallmentDisplay(formatNumber(installment));
   }, [installment]);
@@ -75,6 +63,7 @@ export function LoanForm({loanType, onClose}: Props) {
       if (result.error) {
         setError(result.error);
       } else {
+        onSuccess?.('Loan saved successfully.');
         onClose();
         router.refresh();
       }
@@ -271,25 +260,18 @@ export function LoanForm({loanType, onClose}: Props) {
         <select
           className="rounded-lg border bg-background px-3 py-2 text-sm"
           value={repaymentFrequency}
-          onChange={(e) => setRepaymentFrequency(e.target.value as 'weekly' | 'daily')}
+          onChange={(e) =>
+            setRepaymentFrequency(e.target.value as 'weekly' | 'daily' | 'monthly')
+          }
           name="repaymentFrequency"
         >
           <option value="weekly">Weekly</option>
           <option value="daily">Daily</option>
+          <option value="monthly">Monthly</option>
         </select>
       ) : (
         <input type="hidden" name="repaymentFrequency" value="weekly" />
       )}
-      <input
-        required={loanType === 'vyombo_moto'}
-        type="number"
-        min={1}
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={repaymentFrequency === 'daily' ? 'Duration (Days)' : 'Duration (Weeks)'}
-        name="durationWeeks"
-        value={durationWeeks}
-        onChange={(e) => setDurationWeeks(e.target.value)}
-      />
       <input
         required
         type="text"
@@ -323,9 +305,12 @@ export function LoanForm({loanType, onClose}: Props) {
 
       {loanType === 'electronics' ? (
         <>
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Item Type (TV/AC/Fridge/Cooker)" name="itemType" />
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Brand / Model" name="brandModel" />
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Warranty Period" name="warrantyPeriod" />
+          <input
+            required
+            className="rounded-lg border bg-background px-3 py-2 text-sm"
+            placeholder="Product Name (e.g. 43 inch TV)"
+            name="itemDescription"
+          />
         </>
       ) : null}
       

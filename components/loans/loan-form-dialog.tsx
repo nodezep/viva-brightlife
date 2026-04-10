@@ -13,6 +13,7 @@ type Props = {
 export function LoanFormDialog({loanType}: Props) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   return (
     <div className="no-print w-full">
@@ -24,11 +25,24 @@ export function LoanFormDialog({loanType}: Props) {
           <Plus size={16} /> {open ? t('buttons.cancel') : t('buttons.add_new')}
         </button>
       </div>
+
+      {successMessage ? (
+        <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {successMessage}
+        </div>
+      ) : null}
       
       {open ? (
         <div className="mb-4 w-full">
           <div className="mx-auto w-full max-w-5xl">
-            <LoanForm loanType={loanType} onClose={() => setOpen(false)} />
+            <LoanForm
+              loanType={loanType}
+              onClose={() => setOpen(false)}
+              onSuccess={(message) => {
+                setSuccessMessage(message);
+                setTimeout(() => setSuccessMessage(''), 4000);
+              }}
+            />
           </div>
         </div>
       ) : null}

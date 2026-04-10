@@ -1,7 +1,7 @@
-import {NextResponse} from 'next/server';
+import {NextRequest, NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const supabase = createClient();
   const {
     data: {user}
@@ -28,8 +28,39 @@ export async function POST() {
       .eq('id', user.id);
   }
 
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+  const userAgent = request.headers.get('user-agent') ?? null;
+
   if (existing && existing.is_active === false) {
+    try {
+      await supabase.from('activity_logs').insert({
+        actor_id: user.id,
+        action: 'login_blocked',
+        entity: 'auth',
+        entity_id: null,
+        metadata: {reason: 'account_disabled'},
+        ip,
+        user_agent: userAgent
+      });
+    } catch {
+      // Best-effort logging only.
+    }
     return NextResponse.json({error: 'Account disabled'}, {status: 403});
+  }
+
+  try {
+    await supabase.from('activity_logs').insert({
+      actor_id: user.id,
+      action: 'login_success',
+      entity: 'auth',
+      entity_id: null,
+      metadata: {email: user.email},
+      ip,
+      user_agent: userAgent
+    });
+  } catch {
+    // Best-effort logging only.
   }
 
   return NextResponse.json({

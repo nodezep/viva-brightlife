@@ -13,7 +13,13 @@ import {
   regenerateGroupSchedulesAction
 } from '@/lib/actions/loan-schedules';
 import {useProfile} from '@/lib/hooks/use-profile';
-import {addDaysToDateOnly, formatDateOnlyFromUtc, toUtcDate} from '@/lib/date-only';
+import {
+  addDaysToDateOnly,
+  addMonthsToDateOnly,
+  formatDateOnlyFromUtc,
+  toUtcDate
+} from '@/lib/date-only';
+import {createClient} from '@/lib/supabase/client';
 
 type Props = {
   group: GroupDetail;
@@ -21,6 +27,7 @@ type Props = {
 };
 
 export function GroupMembersModule({group, loans}: Props) {
+  const supabase = createClient();
   const router = useRouter();
   const [members, setMembers] = useState<GroupMemberDetail[]>(group.members);
   const [showNewRow, setShowNewRow] = useState(false);
@@ -28,7 +35,10 @@ export function GroupMembersModule({group, loans}: Props) {
   const [newMemberNumber, setNewMemberNumber] = useState('');
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('Member');
+  const [newMemberFiles, setNewMemberFiles] = useState<File[]>([]);
+  const [newMemberDocType, setNewMemberDocType] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [view, setView] = useState<'members' | 'loans'>('members');
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
@@ -56,6 +66,48 @@ export function GroupMembersModule({group, loans}: Props) {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkMessage, setBulkMessage] = useState('');
   const [bulkError, setBulkError] = useState('');
+
+  const sanitizeFileName = (name: string) =>
+    name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+
+  const uploadMemberDocuments = async (memberId: string) => {
+    if (newMemberFiles.length === 0) {
+      return;
+    }
+
+    for (const file of newMemberFiles) {
+      const safeName = sanitizeFileName(file.name);
+      const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const path = `members/${memberId}/${stamp}-${safeName}`;
+
+      const {error: uploadError} = await supabase.storage
+        .from('member-documents')
+        .upload(path, file, {
+          contentType: file.type || 'application/octet-stream',
+          upsert: false
+        });
+
+      if (uploadError) {
+        setError(uploadError.message);
+        continue;
+      }
+
+      const {error: insertError} = await supabase.from('member_documents').insert({
+        member_id: memberId,
+        loan_id: null,
+        document_type: newMemberDocType.trim() ? newMemberDocType.trim() : null,
+        notes: null,
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        mime_type: file.type || null
+      });
+
+      if (insertError) {
+        setError(insertError.message);
+      }
+    }
+  };
 
   const addMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -110,12 +162,17 @@ export function GroupMembersModule({group, loans}: Props) {
           hasBook: false
         }
       ]);
+      await uploadMemberDocuments(created.id);
+      setSuccessMessage('Member added successfully.');
+      setTimeout(() => setSuccessMessage(''), 4000);
     }
 
     setNewMemberName('');
     setNewMemberNumber('');
     setNewMemberPhone('');
     setNewMemberRole('Member');
+    setNewMemberFiles([]);
+    setNewMemberDocType('');
     setSubmitting(false);
     setShowNewRow(false);
     router.refresh();
@@ -194,6 +251,8 @@ export function GroupMembersModule({group, loans}: Props) {
     }
 
     setSavingMemberId(null);
+    setSuccessMessage('Member updated successfully.');
+    setTimeout(() => setSuccessMessage(''), 4000);
     cancelEdit();
     router.refresh();
   };
@@ -214,6 +273,8 @@ export function GroupMembersModule({group, loans}: Props) {
     }
 
     setMembers((current) => current.filter((member) => member.memberId !== memberId));
+    setSuccessMessage('Member removed successfully.');
+    setTimeout(() => setSuccessMessage(''), 4000);
     router.refresh();
   };
 
@@ -225,10 +286,12 @@ export function GroupMembersModule({group, loans}: Props) {
 
   const getLoanStartDate = (loan: LoanRecord) =>
     loan.returnStartDate ??
-    addDaysToDateOnly(
-      loan.disbursementDate,
-      loan.repaymentFrequency === 'daily' ? 1 : 7
-    ) ??
+    (loan.repaymentFrequency === 'monthly'
+      ? addMonthsToDateOnly(loan.disbursementDate, 1)
+      : addDaysToDateOnly(
+          loan.disbursementDate,
+          loan.repaymentFrequency === 'daily' ? 1 : 7
+        )) ??
     '';
 
   const getExpectedAmount = (
@@ -585,6 +648,11 @@ export function GroupMembersModule({group, loans}: Props) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-medium text-foreground">Group Members</p>
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {successMessage ? (
+                <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  {successMessage}
+                </p>
+              ) : null}
               {error ? (
                 <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
                   {error}
@@ -655,6 +723,25 @@ export function GroupMembersModule({group, loans}: Props) {
                       />
                     </td>
                     <td className="px-3 py-2">
+                      <div className="mb-2 grid gap-2">
+                        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted/30">
+                          <span>{newMemberFiles.length > 0 ? `${newMemberFiles.length} files selected` : 'Attach files'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            multiple
+                            onChange={(event) =>
+                              setNewMemberFiles(Array.from(event.target.files ?? []))
+                            }
+                          />
+                        </label>
+                        <input
+                          className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+                          placeholder="Document type (optional)"
+                          value={newMemberDocType}
+                          onChange={(e) => setNewMemberDocType(e.target.value)}
+                        />
+                      </div>
                       <form onSubmit={addMember} className="flex flex-wrap gap-2">
                         <button
                           type="submit"
@@ -665,7 +752,11 @@ export function GroupMembersModule({group, loans}: Props) {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setShowNewRow(false)}
+                          onClick={() => {
+                            setShowNewRow(false);
+                            setNewMemberFiles([]);
+                            setNewMemberDocType('');
+                          }}
                           className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
                         >
                           Cancel

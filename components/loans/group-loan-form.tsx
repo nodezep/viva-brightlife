@@ -1,6 +1,6 @@
 'use client';
 
-import {useTransition, useState, useEffect} from 'react';
+import {useTransition, useState} from 'react';
 import {useTranslations} from 'next-intl';
 import {createLoanAction} from '@/lib/actions/loan';
 import type {LoanType} from '@/types';
@@ -10,9 +10,10 @@ type Props = {
   groupId: string;
   members: GroupMemberDetail[];
   onClose: () => void;
+  onSuccess?: (message: string) => void;
 };
 
-export function GroupLoanForm({groupId, members, onClose}: Props) {
+export function GroupLoanForm({groupId, members, onClose, onSuccess}: Props) {
   const t = useTranslations();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -20,20 +21,7 @@ export function GroupLoanForm({groupId, members, onClose}: Props) {
   const eligibleMembers = members.filter((member) => member.hasBook);
 
   const [totalRepay, setTotalRepay] = useState('');
-  const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState('');
-
-  useEffect(() => {
-    const repayVal = Number(totalRepay);
-    const weeksVal = Number(durationWeeks);
-    if (repayVal > 0 && weeksVal > 0) {
-      const perWeek = repayVal / weeksVal;
-      const suggested = Math.ceil(perWeek / 100) * 100;
-      setInstallment(suggested.toString());
-    } else if (!repayVal || !weeksVal) {
-      setInstallment('');
-    }
-  }, [totalRepay, durationWeeks]);
 
   const handleSubmit = (formData: FormData) => {
     setError(null);
@@ -46,6 +34,7 @@ export function GroupLoanForm({groupId, members, onClose}: Props) {
       if (result.error) {
         setError(result.error);
       } else {
+        onSuccess?.('Loan saved successfully.');
         onClose();
       }
     });
@@ -118,15 +107,6 @@ export function GroupLoanForm({groupId, members, onClose}: Props) {
         name="outstandingBalance"
         value={totalRepay}
         onChange={(e) => setTotalRepay(e.target.value)}
-      />
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder="Duration (Weeks)"
-        name="durationWeeks"
-        value={durationWeeks}
-        onChange={(e) => setDurationWeeks(e.target.value)}
       />
       <input
         required

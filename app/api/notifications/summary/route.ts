@@ -15,7 +15,7 @@ export async function GET() {
 
   const {data: profile} = await supabase
     .from('profiles')
-    .select('is_active')
+    .select('is_active, role')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -24,5 +24,13 @@ export async function GET() {
   }
 
   const items = await getUpcomingDueReminders({limit: 5});
-  return NextResponse.json({items, total: items.length});
+  let pendingSmsCount = 0;
+  if (profile?.role === 'admin') {
+    const {count} = await supabase
+      .from('sms_reminders')
+      .select('id', {count: 'exact', head: true})
+      .eq('status', 'pending_approval');
+    pendingSmsCount = count ?? 0;
+  }
+  return NextResponse.json({items, total: items.length, pendingSmsCount});
 }

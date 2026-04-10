@@ -2,7 +2,6 @@ import type {LoanType, NavItem} from '@/types';
 
 export const navItems: NavItem[] = [
   {key: 'dashboard', href: '/dashboard', icon: 'LayoutDashboard'},
-  {key: 'user_management', href: '/users', icon: 'Users2'},
   {key: 'mikopo_binafsi', href: '/mikopo-binafsi', icon: 'Wallet'},
   {key: 'mikopo_wafanyabiashara', href: '/mikopo-wafanyabiashara', icon: 'Briefcase'},
   {key: 'mikopo_watumishi', href: '/mikopo-watumishi', icon: 'Users2'},
@@ -17,7 +16,9 @@ export const navItems: NavItem[] = [
   {key: 'mikopo_vyombo_moto', href: '/mikopo-vyombo-moto', icon: 'Bike'},
   {key: 'admission_book', href: '/admission-book', icon: 'FileSpreadsheet'},
   {key: 'ripoti', href: '/ripoti', icon: 'FileSpreadsheet'},
-  {key: 'sms_reminders', href: '/sms-reminders', icon: 'MessageSquare'}
+  {key: 'sms_reminders', href: '/sms-reminders', icon: 'MessageSquare'},
+  {key: 'user_management', href: '/users', icon: 'Users2'},
+  {key: 'audit_log', href: '/audit', icon: 'ShieldCheck'}
 ];
 
 export const loanPageMap: Record<string, LoanType> = {

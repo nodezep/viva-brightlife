@@ -8,11 +8,13 @@ import type {UpcomingDueReminder} from '@/lib/notifications/upcoming';
 type SummaryResponse = {
   items: UpcomingDueReminder[];
   total: number;
+  pendingSmsCount?: number;
 };
 
 export function NotificationsPopout() {
   const locale = useLocale();
   const [items, setItems] = useState<UpcomingDueReminder[]>([]);
+  const [pendingSmsCount, setPendingSmsCount] = useState(0);
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export function NotificationsPopout() {
         const payload = (await response.json()) as SummaryResponse;
         if (!active) return;
         setItems(payload.items ?? []);
+        setPendingSmsCount(payload.pendingSmsCount ?? 0);
       } catch {
         if (!active) return;
         setItems([]);
@@ -35,7 +38,7 @@ export function NotificationsPopout() {
     };
   }, []);
 
-  if (!open || items.length === 0) {
+  if (!open || (items.length === 0 && pendingSmsCount === 0)) {
     return null;
   }
 
@@ -43,6 +46,7 @@ export function NotificationsPopout() {
     if (status === 'delivered') return 'bg-emerald-100 text-emerald-800';
     if (status === 'sent') return 'bg-green-100 text-green-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';
+    if (status === 'pending_approval') return 'bg-purple-100 text-purple-800';
     if (status === 'queued') return 'bg-amber-100 text-amber-800';
     return 'bg-slate-100 text-slate-800';
   };
@@ -65,6 +69,11 @@ export function NotificationsPopout() {
           </button>
         </div>
         <div className="mt-3 space-y-2">
+          {pendingSmsCount > 0 ? (
+            <div className="rounded-lg border bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {pendingSmsCount} SMS awaiting approval.
+            </div>
+          ) : null}
           {items.map((item) => (
             <div
               key={item.scheduleId}

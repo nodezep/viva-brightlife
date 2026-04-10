@@ -12,7 +12,14 @@ export type UpcomingDueReminder = {
   paidAmount: number;
   amountDue: number;
   daysUntil: number;
-  reminderStatus: 'not_scheduled' | 'queued' | 'sent' | 'failed' | 'delivered' | 'cancelled';
+  reminderStatus:
+    | 'not_scheduled'
+    | 'queued'
+    | 'pending_approval'
+    | 'sent'
+    | 'failed'
+    | 'delivered'
+    | 'cancelled';
   reminderScheduledFor: string | null;
   reminderSentAt: string | null;
 };
@@ -29,7 +36,7 @@ type UpcomingSchedule = {
         loan_number: string;
         outstanding_balance: number;
         status: string;
-        repayment_frequency?: 'weekly' | 'daily' | null;
+        repayment_frequency?: 'weekly' | 'daily' | 'monthly' | null;
         members:
           | {id: string; full_name: string; phone: string | null}
           | {id: string; full_name: string; phone: string | null}[]
@@ -40,7 +47,7 @@ type UpcomingSchedule = {
         loan_number: string;
         outstanding_balance: number;
         status: string;
-        repayment_frequency?: 'weekly' | 'daily' | null;
+        repayment_frequency?: 'weekly' | 'daily' | 'monthly' | null;
         members:
           | {id: string; full_name: string; phone: string | null}
           | {id: string; full_name: string; phone: string | null}[]
@@ -189,8 +196,9 @@ export async function getUpcomingDueReminders(options?: {
     .slice(0, limit)
     .map((row) => {
       const reminder = reminderMap.get(`${row.loanId}|${row.reminderKey}`);
-      const status =
-        (reminder?.delivery_status ?? reminder?.status ?? 'not_scheduled') as UpcomingDueReminder['reminderStatus'];
+      const status = (reminder?.status === 'pending_approval'
+        ? 'pending_approval'
+        : reminder?.delivery_status ?? reminder?.status ?? 'not_scheduled') as UpcomingDueReminder['reminderStatus'];
       return {
         scheduleId: row.scheduleId,
         loanId: row.loanId,

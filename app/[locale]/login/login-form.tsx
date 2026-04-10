@@ -23,6 +23,15 @@ export function LoginForm() {
     });
 
     if (signInError) {
+      void fetch('/api/auth/audit', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          email,
+          success: false,
+          reason: signInError.message
+        })
+      });
       setError(signInError.message);
       setLoading(false);
       return;

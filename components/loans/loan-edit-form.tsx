@@ -1,6 +1,6 @@
 'use client';
 
-import {useTransition, useState, useEffect} from 'react';
+import {useTransition, useState, useEffect, type ReactNode} from 'react';
 import {useTranslations} from 'next-intl';
 import {updateLoanAction} from '@/lib/actions/loan';
 import type {LoanRecord} from '@/types';
@@ -11,18 +11,36 @@ type Props = {
   onClose: () => void;
 };
 
+const Field = ({label, children}: {label: string; children: ReactNode}) => (
+  <label className="relative block">
+    <span className="pointer-events-none absolute left-3 top-1 text-[10px] font-medium text-muted-foreground">
+      {label}
+    </span>
+    {children}
+  </label>
+);
+
 export function LoanEditForm({loan, onClose}: Props) {
   const t = useTranslations();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
   const isIndividual = loan.loanType === 'binafsi';
 
   const [totalRepay, setTotalRepay] = useState(String(loan.outstandingBalance ?? ''));
-  const [durationWeeks, setDurationWeeks] = useState('');
   const [installment, setInstallment] = useState(String(loan.installmentSize ?? ''));
-  const [repaymentFrequency, setRepaymentFrequency] = useState<'weekly' | 'daily'>(
-    loan.repaymentFrequency === 'daily' ? 'daily' : 'weekly'
+  const [repaymentFrequency, setRepaymentFrequency] = useState<
+    'weekly' | 'daily' | 'monthly'
+  >(
+    loan.repaymentFrequency === 'daily'
+      ? 'daily'
+      : loan.repaymentFrequency === 'monthly'
+        ? 'monthly'
+        : 'weekly'
+  );
+  const [itemDescription, setItemDescription] = useState(
+    loan.itemDescription ?? ''
   );
 
   const [principal, setPrincipal] = useState(String(loan.disbursementAmount ?? ''));
@@ -86,16 +104,6 @@ export function LoanEditForm({loan, onClose}: Props) {
   }, [amountPaid]);
 
   useEffect(() => {
-    const repayVal = Number(totalRepay);
-    const weeksVal = Number(durationWeeks);
-    if (repayVal > 0 && weeksVal > 0) {
-    const perPeriod = repayVal / weeksVal;
-    const suggested = Math.ceil(perPeriod / 100) * 100;
-    setInstallment(suggested.toString());
-  }
-}, [totalRepay, durationWeeks]);
-
-  useEffect(() => {
     setDisbursementAmountDisplay(formatNumber(disbursementAmount));
   }, [disbursementAmount]);
 
@@ -125,6 +133,8 @@ export function LoanEditForm({loan, onClose}: Props) {
       if (result.error) {
         setError(result.error);
       } else {
+        setSuccessMessage('Loan updated successfully.');
+        setTimeout(() => setSuccessMessage(''), 4000);
         onClose();
         router.refresh();
       }
@@ -139,95 +149,113 @@ export function LoanEditForm({loan, onClose}: Props) {
       <input type="hidden" name="loanId" value={loan.id} />
       {isIndividual ? (
         <>
-          <input
-            required
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="S/NO"
-            name="memberNumber"
-            value={memberSerial}
-            onChange={(e) => setMemberSerial(e.target.value)}
-          />
-          <input
-            required
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Jina"
-            name="memberName"
-            defaultValue={loan.memberName}
-          />
-          <input
-            required
-            type="text"
-            inputMode="numeric"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Kiasi cha Mkopo"
-            value={principalDisplay}
-            onChange={(e) => {
-              const raw = stripNumber(e.target.value);
-              setPrincipal(raw);
-              setPrincipalDisplay(formatNumber(raw));
-            }}
-          />
+          <Field label="S/NO">
+            <input
+              required
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="S/NO"
+              name="memberNumber"
+              value={memberSerial}
+              onChange={(e) => setMemberSerial(e.target.value)}
+            />
+          </Field>
+          <Field label="Jina">
+            <input
+              required
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Jina"
+              name="memberName"
+              defaultValue={loan.memberName}
+            />
+          </Field>
+          <Field label="Kiasi cha Mkopo">
+            <input
+              required
+              type="text"
+              inputMode="numeric"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Kiasi cha Mkopo"
+              value={principalDisplay}
+              onChange={(e) => {
+                const raw = stripNumber(e.target.value);
+                setPrincipal(raw);
+                setPrincipalDisplay(formatNumber(raw));
+              }}
+            />
+          </Field>
           <input type="hidden" name="disbursementAmount" value={principal} />
-          <input
-            required
-            type="date"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            name="disbursementDate"
-            value={disbursementDate}
-            onChange={(e) => setDisbursementDate(e.target.value)}
-          />
-          <input
-            type="number"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Idadi ya Siku za Malimbikizo"
-            name="daysOverdue"
-            value={daysOverdue}
-            onChange={(e) => setDaysOverdue(e.target.value)}
-            min={0}
-          />
-          <input
-            required
-            type="text"
-            inputMode="decimal"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Asilimia ya Riba"
-            name="interestRate"
-            value={interestRate}
-            onChange={(e) => setInterestRate(e.target.value)}
-            min={0}
-            step="0.01"
-          />
-          <input
-            type="number"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Muda wa Mkopo (Mwezi)"
-            name="durationMonths"
-            value={durationMonths}
-            onChange={(e) => setDurationMonths(e.target.value)}
-            min={1}
-          />
-          <input
-            type="text"
-            inputMode="numeric"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Malipo ya Mkopo"
-            value={amountPaidDisplay}
-            onChange={(e) => {
-              const raw = stripNumber(e.target.value);
-              setAmountPaid(raw);
-              setAmountPaidDisplay(formatNumber(raw));
-            }}
-            min={0}
-          />
+          <Field label="Disbursement Date">
+            <input
+              required
+              type="date"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              name="disbursementDate"
+              value={disbursementDate}
+              onChange={(e) => setDisbursementDate(e.target.value)}
+            />
+          </Field>
+          <Field label="Idadi ya Siku za Malimbikizo">
+            <input
+              type="number"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Idadi ya Siku za Malimbikizo"
+              name="daysOverdue"
+              value={daysOverdue}
+              onChange={(e) => setDaysOverdue(e.target.value)}
+              min={0}
+            />
+          </Field>
+          <Field label="Asilimia ya Riba">
+            <input
+              required
+              type="text"
+              inputMode="decimal"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Asilimia ya Riba"
+              name="interestRate"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              min={0}
+              step="0.01"
+            />
+          </Field>
+          <Field label="Muda wa Mkopo (Mwezi)">
+            <input
+              type="number"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Muda wa Mkopo (Mwezi)"
+              name="durationMonths"
+              value={durationMonths}
+              onChange={(e) => setDurationMonths(e.target.value)}
+              min={1}
+            />
+          </Field>
+          <Field label="Malipo ya Mkopo">
+            <input
+              type="text"
+              inputMode="numeric"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Malipo ya Mkopo"
+              value={amountPaidDisplay}
+              onChange={(e) => {
+                const raw = stripNumber(e.target.value);
+                setAmountPaid(raw);
+                setAmountPaidDisplay(formatNumber(raw));
+              }}
+              min={0}
+            />
+          </Field>
           <input type="hidden" name="amountPaid" value={amountPaid} />
-          <input
-            type="tel"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Namba ya Simu"
-            name="memberPhone"
-            value={memberPhone}
-            onChange={(e) => setMemberPhone(e.target.value)}
-          />
+          <Field label="Namba ya Simu">
+            <input
+              type="tel"
+              className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+              placeholder="Namba ya Simu"
+              name="memberPhone"
+              value={memberPhone}
+              onChange={(e) => setMemberPhone(e.target.value)}
+            />
+          </Field>
 
           <input type="hidden" name="cycle" value={durationMonthsValue || 1} />
           <input type="hidden" name="durationWeeks" value={0} />
@@ -236,148 +264,179 @@ export function LoanEditForm({loan, onClose}: Props) {
         </>
       ) : (
         <>
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.member_number') || 'Member Number'}
-        name="memberNumber"
-        defaultValue={loan.memberNumber}
-      />
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.member_name') || 'Member Name'}
-        name="memberName"
-        defaultValue={loan.memberName}
-      />
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.loan_number') || 'Loan Number'}
-        name="loanNumber"
-        defaultValue={loan.loanNumber}
-      />
-      <input
-        required
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.disbursement_amount') || 'Disbursement Amount'}
-        value={disbursementAmountDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setDisbursementAmount(raw);
-          setDisbursementAmountDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.member_number') || 'Member Number'}>
+        <input
+          required
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.member_number') || 'Member Number'}
+          name="memberNumber"
+          defaultValue={loan.memberNumber}
+        />
+      </Field>
+      <Field label={t('table.member_name') || 'Member Name'}>
+        <input
+          required
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.member_name') || 'Member Name'}
+          name="memberName"
+          defaultValue={loan.memberName}
+        />
+      </Field>
+      {loan.loanType === 'electronics' ? (
+        <Field label="Product Name">
+          <input
+            className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+            placeholder="Product Name (e.g. 43 inch TV)"
+            name="itemDescription"
+            value={itemDescription}
+            onChange={(e) => setItemDescription(e.target.value)}
+          />
+        </Field>
+      ) : null}
+      <Field label={t('table.loan_number') || 'Loan Number'}>
+        <input
+          required
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.loan_number') || 'Loan Number'}
+          name="loanNumber"
+          defaultValue={loan.loanNumber}
+        />
+      </Field>
+      <Field label={t('table.disbursement_amount') || 'Disbursement Amount'}>
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.disbursement_amount') || 'Disbursement Amount'}
+          value={disbursementAmountDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setDisbursementAmount(raw);
+            setDisbursementAmountDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="disbursementAmount" value={disbursementAmount} />
-      <input
-        required
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        name="disbursementDate"
-        defaultValue={loan.disbursementDate}
-      />
-      <input
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        name="returnStartDate"
-        value={returnStartDate}
-        onChange={(e) => setReturnStartDate(e.target.value)}
-        placeholder="Return Start Date (optional)"
-      />
-      <input
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.security_amount') || 'Security Amount'}
-        value={securityAmountDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setSecurityAmount(raw);
-          setSecurityAmountDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label="Disbursement Date">
+        <input
+          required
+          type="date"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          name="disbursementDate"
+          defaultValue={loan.disbursementDate}
+        />
+      </Field>
+      <Field label="Return Start Date (optional)">
+        <input
+          type="date"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          name="returnStartDate"
+          value={returnStartDate}
+          onChange={(e) => setReturnStartDate(e.target.value)}
+          placeholder="Return Start Date (optional)"
+        />
+      </Field>
+      <Field label={t('table.security_amount') || 'Security Amount'}>
+        <input
+          type="text"
+          inputMode="numeric"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.security_amount') || 'Security Amount'}
+          value={securityAmountDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setSecurityAmount(raw);
+            setSecurityAmountDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="securityAmount" value={securityAmount} />
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.cycle') || 'Cycle'}
-        name="cycle"
-        defaultValue={loan.cycle}
-      />
-      <input
-        required
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder="Total Expected Repayment (OS Balance)"
-        value={totalRepayDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setTotalRepay(raw);
-          setTotalRepayDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.cycle') || 'Cycle'}>
+        <input
+          required
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.cycle') || 'Cycle'}
+          name="cycle"
+          defaultValue={loan.cycle}
+        />
+      </Field>
+      <Field label="Total Expected Repayment (OS Balance)">
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder="Total Expected Repayment (OS Balance)"
+          value={totalRepayDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setTotalRepay(raw);
+            setTotalRepayDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="outstandingBalance" value={totalRepay} />
       {loan.loanType !== 'vikundi_wakinamama' ? (
-        <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={repaymentFrequency}
-          onChange={(e) => setRepaymentFrequency(e.target.value as 'weekly' | 'daily')}
-          name="repaymentFrequency"
-        >
-          <option value="weekly">Weekly</option>
-          <option value="daily">Daily</option>
-        </select>
+        <Field label="Repayment Frequency">
+          <select
+            className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+            value={repaymentFrequency}
+            onChange={(e) =>
+              setRepaymentFrequency(
+                e.target.value as 'weekly' | 'daily' | 'monthly'
+              )
+            }
+            name="repaymentFrequency"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </Field>
       ) : (
         <input type="hidden" name="repaymentFrequency" value="weekly" />
       )}
-      <input
-        required={loan.loanType === 'vyombo_moto'}
-        type="number"
-        min={1}
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={
-          repaymentFrequency === 'daily'
-            ? 'Duration (Days) - to regenerate schedule'
-            : 'Duration (Weeks) - to regenerate schedule'
-        }
-        name="durationWeeks"
-        value={durationWeeks}
-        onChange={(e) => setDurationWeeks(e.target.value)}
-      />
-      <input
-        required
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.installment_size') || 'Installment Size'}
-        value={installmentDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setInstallment(raw);
-          setInstallmentDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.installment_size') || 'Installment Size'}>
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.installment_size') || 'Installment Size'}
+          value={installmentDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setInstallment(raw);
+            setInstallmentDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="installmentSize" value={installment} />
-      <input
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.overdue_od') || 'Overdue OD'}
-        value={overdueAmountDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setOverdueAmount(raw);
-          setOverdueAmountDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.overdue_od') || 'Overdue OD'}>
+        <input
+          type="text"
+          inputMode="numeric"
+          className="w-full rounded-lg border bg-background px-3 pb-2 pt-5 text-sm"
+          placeholder={t('table.overdue_od') || 'Overdue OD'}
+          value={overdueAmountDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setOverdueAmount(raw);
+            setOverdueAmountDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="overdueAmount" value={overdueAmount} />
         </>
       )}
 
+      {successMessage ? (
+        <p className="md:col-span-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {successMessage}
+        </p>
+      ) : null}
       {error ? (
         <p className="md:col-span-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}

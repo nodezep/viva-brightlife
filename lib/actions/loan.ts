@@ -13,7 +13,16 @@ const getDefaultReturnStartDate = (
   disbursementDate: string,
   repaymentFrequency: string
 ) =>
-  addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
+  repaymentFrequency === 'monthly'
+    ? addMonthsToDateOnly(disbursementDate, 1)
+    : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
+
+const computeDurationPeriods = (total: number, installment: number) => {
+  if (total <= 0 || installment <= 0) {
+    return 0;
+  }
+  return Math.max(1, Math.ceil(total / installment));
+};
 
 export async function createLoanAction(formData: FormData) {
   const supabase = createClient();
@@ -35,22 +44,22 @@ export async function createLoanAction(formData: FormData) {
   const amountPaid = Number(formData.get('amountPaid') || 0);
   const memberPhone = formData.get('memberPhone') as string | null;
   const daysOverdue = Number(formData.get('daysOverdue') || 0);
-  const repaymentFrequency = (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
+  const repaymentFrequency =
+    (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
   const returnStartDateRaw = (formData.get('returnStartDate') as string | null) ?? '';
   const durationWeeksRaw = formData.get('durationWeeks');
-  const durationWeeks =
+  let durationWeeks =
     durationWeeksRaw === null || durationWeeksRaw === ''
-      ? 1
+      ? 0
       : Number(durationWeeksRaw);
   const durationMonths = Number(formData.get('durationMonths') || 0);
 
-  if (loanType === 'vyombo_moto') {
-    if (durationWeeksRaw === null || durationWeeksRaw === '' || durationWeeks <= 0) {
+  if (loanType !== 'binafsi') {
+    durationWeeks = computeDurationPeriods(outstandingBalance, installmentSize);
+    if (durationWeeks <= 0) {
       return {
         error:
-          repaymentFrequency === 'daily'
-            ? 'Please enter duration in days for vehicle loans.'
-            : 'Please enter duration in weeks for vehicle loans.'
+          'Please enter installment size and total repayment so the schedule can be calculated.'
       };
     }
   }
@@ -67,11 +76,16 @@ export async function createLoanAction(formData: FormData) {
   // Custom desc build
   let itemDescription = '';
   if (loanType === 'electronics') {
-    itemDescription = [
-      formData.get('itemType'),
-      formData.get('brandModel'),
-      formData.get('warrantyPeriod')
-    ].filter(Boolean).join(' | ');
+    const productName = (formData.get('itemDescription') as string | null)?.trim();
+    if (productName) {
+      itemDescription = productName;
+    } else {
+      itemDescription = [
+        formData.get('itemType'),
+        formData.get('brandModel'),
+        formData.get('warrantyPeriod')
+      ].filter(Boolean).join(' | ');
+    }
   } else if (loanType === 'kilimo') {
     itemDescription = [
       formData.get('cropType'),
@@ -138,6 +152,8 @@ export async function createLoanAction(formData: FormData) {
     }
   }
 
+  const resolvedCycleCount = loanType === 'binafsi' ? cycleCount : durationWeeks;
+
   const insertPayload: Record<string, unknown> = {
     member_id: memberId,
     group_id: groupId || null,
@@ -146,7 +162,7 @@ export async function createLoanAction(formData: FormData) {
     principal_amount: principalAmount,
     disbursement_date: disbursementDate,
     security_amount: securityAmount,
-    cycle_count: cycleCount,
+    cycle_count: resolvedCycleCount,
     weekly_installment: installmentSize,
     monthly_installment: 0,
     amount_withdrawn: 0,
@@ -200,10 +216,18 @@ export async function createLoanAction(formData: FormData) {
     }
     let currentDate = new Date(start);
     const isDaily = repaymentFrequency === 'daily';
+    const isMonthly = repaymentFrequency === 'monthly';
 
     for (let i = 1; i <= durationWeeks; i++) {
       if (i > 1) {
-        currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
+        if (isMonthly) {
+          const next = addMonthsToDateOnly(formatDateOnlyFromUtc(currentDate), 1);
+          if (next) {
+            currentDate = toUtcDate(next) ?? currentDate;
+          }
+        } else {
+          currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
+        }
       }
       
       const isLastWeek = i === durationWeeks;
@@ -294,10 +318,11 @@ export async function updateLoanAction(formData: FormData) {
   const amountPaid = Number(formData.get('amountPaid') || 0);
   const memberPhone = formData.get('memberPhone') as string | null;
   const daysOverdue = Number(formData.get('daysOverdue') || 0);
+  const itemDescription = (formData.get('itemDescription') as string | null) ?? '';
   const repaymentFrequency = (formData.get('repaymentFrequency') as string | null) ?? 'weekly';
   const returnStartDateRaw = (formData.get('returnStartDate') as string | null) ?? '';
   const durationWeeksRaw = formData.get('durationWeeks');
-  const durationWeeks =
+  let durationWeeks =
     durationWeeksRaw === null || durationWeeksRaw === ''
       ? 0
       : Number(durationWeeksRaw);
@@ -316,13 +341,12 @@ export async function updateLoanAction(formData: FormData) {
   const memberId = loanRow.member_id as string;
   const loanType = loanRow.loan_type as string;
 
-  if (loanType === 'vyombo_moto') {
-    if (durationWeeksRaw === null || durationWeeksRaw === '' || durationWeeks <= 0) {
+  if (loanType !== 'binafsi') {
+    durationWeeks = computeDurationPeriods(outstandingBalance, installmentSize);
+    if (durationWeeks <= 0) {
       return {
         error:
-          repaymentFrequency === 'daily'
-            ? 'Please enter duration in days for vehicle loans.'
-            : 'Please enter duration in weeks for vehicle loans.'
+          'Please enter installment size and total repayment so the schedule can be calculated.'
       };
     }
   }
@@ -353,12 +377,14 @@ export async function updateLoanAction(formData: FormData) {
     return {error: memberError.message};
   }
 
+  const resolvedCycleCount = loanType === 'binafsi' ? cycleCount : durationWeeks;
+
   const updatePayload: Record<string, unknown> = {
     loan_number: loanNumber,
     principal_amount: principalAmount,
     disbursement_date: disbursementDate,
     security_amount: securityAmount,
-    cycle_count: cycleCount,
+    cycle_count: resolvedCycleCount,
     weekly_installment: installmentSize,
     outstanding_balance: outstandingBalance,
     overdue_amount: overdueAmount
@@ -380,6 +406,10 @@ export async function updateLoanAction(formData: FormData) {
         ? returnStartDateRaw
         : defaultReturnStart;
   }
+  
+  if (loanType === 'electronics') {
+    updatePayload.item_description = itemDescription.trim() || null;
+  }
 
   const {error: updateError} = await supabase.from('loans').update(updatePayload).eq('id', loanId);
 
@@ -387,7 +417,10 @@ export async function updateLoanAction(formData: FormData) {
     return {error: updateError.message};
   }
 
-  const durationWeeksValue = durationWeeks > 0 ? durationWeeks : cycleCount;
+  const durationWeeksValue =
+    loanType === 'binafsi'
+      ? cycleCount
+      : computeDurationPeriods(outstandingBalance, installmentSize);
 
   if (loanType !== 'binafsi' && durationWeeksValue > 0) {
     const {error: deleteError} = await supabase
@@ -416,10 +449,18 @@ export async function updateLoanAction(formData: FormData) {
     }
     let currentDate = new Date(start);
     const isDaily = repaymentFrequency === 'daily';
+    const isMonthly = repaymentFrequency === 'monthly';
 
     for (let i = 1; i <= durationWeeksValue; i++) {
       if (i > 1) {
-        currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
+        if (isMonthly) {
+          const next = addMonthsToDateOnly(formatDateOnlyFromUtc(currentDate), 1);
+          if (next) {
+            currentDate = toUtcDate(next) ?? currentDate;
+          }
+        } else {
+          currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
+        }
       }
       const isLastWeek = i === durationWeeksValue;
       let expectedAmount = isLastWeek

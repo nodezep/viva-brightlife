@@ -1,11 +1,13 @@
 'use client';
 
 import {Fragment, useTransition, useState, useEffect, useCallback} from 'react';
-import {Trash2, CalendarDays} from 'lucide-react';
+import {Trash2, CalendarDays, FileText, Paperclip} from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import type {LoanRecord, LoanType} from '@/types';
 import {deleteLoanAction} from '@/lib/actions/loan';
 import {LoanSchedulesDialog} from './loan-schedules-dialog';
+import {LoanStatementDialog} from './loan-statement-dialog';
+import {MemberDocumentsDialog} from './member-documents-dialog';
 import {LoanEditForm} from './loan-edit-form';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 import {useProfile} from '@/lib/hooks/use-profile';
@@ -28,11 +30,15 @@ export function LoanTable({loanType, rows, count}: Props) {
   const [isPending, startTransition] = useTransition();
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
   const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
+  const [statementLoan, setStatementLoan] = useState<LoanRecord | null>(null);
+  const [docsLoan, setDocsLoan] = useState<LoanRecord | null>(null);
   const isIndividual = loanType === 'binafsi';
+  const isElectronics = loanType === 'electronics';
   const [deleteTarget, setDeleteTarget] = useState<LoanRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const {profile} = useProfile();
   const [permissionError, setPermissionError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const totals = rows.reduce(
     (acc, row) => {
@@ -83,6 +89,7 @@ export function LoanTable({loanType, rows, count}: Props) {
           'number',
           'member_number',
           'member_name',
+          ...(isElectronics ? ['product_name'] : []),
           'cycle',
           'security_amount',
           'loan_number',
@@ -135,6 +142,7 @@ export function LoanTable({loanType, rows, count}: Props) {
         index + 1,
         r.memberNumber,
         r.memberName,
+        ...(isElectronics ? [r.itemDescription ?? ''] : []),
         r.cycle,
         r.securityAmount,
         r.loanNumber,
@@ -159,7 +167,7 @@ export function LoanTable({loanType, rows, count}: Props) {
     link.download = `${loanType}-report.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [isIndividual, loanType, rows]);
+  }, [isElectronics, isIndividual, loanType, rows]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -190,6 +198,11 @@ export function LoanTable({loanType, rows, count}: Props) {
           Showing {rows.length} of {count}
         </span>
       </div>
+      {successMessage ? (
+        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {successMessage}
+        </div>
+      ) : null}
       {permissionError ? (
         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {permissionError}
@@ -282,6 +295,18 @@ export function LoanTable({loanType, rows, count}: Props) {
                         <CalendarDays size={12} /> Marejesho
                       </button>
                       <button
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
+                        onClick={() => setStatementLoan(row)}
+                      >
+                        <FileText size={12} /> Statement
+                      </button>
+                      <button
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
+                        onClick={() => setDocsLoan(row)}
+                      >
+                        <Paperclip size={12} /> Documents
+                      </button>
+                      <button
                         className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                         onClick={() =>
                           setEditingLoanId(editingLoanId === row.id ? null : row.id)
@@ -360,19 +385,31 @@ export function LoanTable({loanType, rows, count}: Props) {
                       <td className="px-3 py-2">{currency.format(row.installmentSize)}</td>
                       <td className="px-3 py-2">{currency.format(row.outstandingBalance)}</td>
                       <td className="px-3 py-2">{row.memberPhone ?? '-'}</td>
-                      <td className="px-3 py-2">
+                    <td className="px-3 py-2">
+                      <button
+                        className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                        onClick={() => setSelectedLoanId(row.id)}
+                      >
+                        <CalendarDays size={12} /> Marejesho
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 no-print">
+                      <div className="flex gap-1">
                         <button
-                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                          onClick={() => setSelectedLoanId(row.id)}
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                          onClick={() => setStatementLoan(row)}
                         >
-                          <CalendarDays size={12} /> Marejesho
+                          <FileText size={12} /> Statement
                         </button>
-                      </td>
-                      <td className="px-3 py-2 no-print">
-                        <div className="flex gap-1">
-                          <button
-                            className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                            onClick={() =>
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                          onClick={() => setDocsLoan(row)}
+                        >
+                          <Paperclip size={12} /> Docs
+                        </button>
+                        <button
+                          className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                          onClick={() =>
                               setEditingLoanId(editingLoanId === row.id ? null : row.id)
                             }
                           >
@@ -441,6 +478,11 @@ export function LoanTable({loanType, rows, count}: Props) {
                     <div>
                       <p className="text-xs text-muted-foreground">{row.memberNumber}</p>
                       <p className="text-sm font-semibold">{row.memberName}</p>
+                      {isElectronics ? (
+                        <p className="text-xs text-muted-foreground">
+                          Product: {row.itemDescription ?? '-'}
+                        </p>
+                      ) : null}
                       <p className="text-xs text-muted-foreground">{row.loanNumber}</p>
                     </div>
                     <div className="text-right">
@@ -492,6 +534,18 @@ export function LoanTable({loanType, rows, count}: Props) {
                       <CalendarDays size={12} /> Marejesho
                     </button>
                     <button
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
+                      onClick={() => setStatementLoan(row)}
+                    >
+                      <FileText size={12} /> Statement
+                    </button>
+                    <button
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
+                      onClick={() => setDocsLoan(row)}
+                    >
+                      <Paperclip size={12} /> Documents
+                    </button>
+                    <button
                       className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                       onClick={() =>
                         setEditingLoanId(editingLoanId === row.id ? null : row.id)
@@ -528,6 +582,9 @@ export function LoanTable({loanType, rows, count}: Props) {
                 <th className="px-3 py-2">{t('table.number')}</th>
                 <th className="px-3 py-2">{t('table.member_number')}</th>
                 <th className="px-3 py-2">{t('table.member_name')}</th>
+                {isElectronics ? (
+                  <th className="px-3 py-2">Product Name</th>
+                ) : null}
                 <th className="px-3 py-2 hidden lg:table-cell">{t('table.cycle')}</th>
                 <th className="px-3 py-2 hidden lg:table-cell">{t('table.security_amount')}</th>
                 <th className="px-3 py-2">{t('table.loan_number')}</th>
@@ -548,6 +605,9 @@ export function LoanTable({loanType, rows, count}: Props) {
                     <td className="px-3 py-2">{row.memberNumber}</td>
                     <td className="px-3 py-2">{row.memberNumber}</td>
                     <td className="px-3 py-2">{row.memberName}</td>
+                    {isElectronics ? (
+                      <td className="px-3 py-2">{row.itemDescription ?? '-'}</td>
+                    ) : null}
                     <td className="px-3 py-2 hidden lg:table-cell">{row.cycle}</td>
                     <td className="px-3 py-2 hidden lg:table-cell">{currency.format(row.securityAmount)}</td>
                     <td className="px-3 py-2">{row.loanNumber}</td>
@@ -570,6 +630,18 @@ export function LoanTable({loanType, rows, count}: Props) {
                     <td className="px-3 py-2 no-print">
                       <div className="flex gap-1">
                         <button
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                          onClick={() => setStatementLoan(row)}
+                        >
+                          <FileText size={12} /> Statement
+                        </button>
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                          onClick={() => setDocsLoan(row)}
+                        >
+                          <Paperclip size={12} /> Docs
+                        </button>
+                        <button
                           className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
                           onClick={() =>
                             setEditingLoanId(editingLoanId === row.id ? null : row.id)
@@ -589,7 +661,7 @@ export function LoanTable({loanType, rows, count}: Props) {
                   </tr>
                   {editingLoanId === row.id ? (
                     <tr className="border-t bg-muted/20">
-                      <td colSpan={14} className="px-3 py-3">
+                      <td colSpan={isElectronics ? 15 : 14} className="px-3 py-3">
                         <LoanEditForm
                           loan={row}
                           onClose={() => setEditingLoanId(null)}
@@ -601,7 +673,10 @@ export function LoanTable({loanType, rows, count}: Props) {
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-6 text-center text-muted-foreground" colSpan={13}>
+                  <td
+                    className="px-3 py-6 text-center text-muted-foreground"
+                    colSpan={isElectronics ? 15 : 14}
+                  >
                     No records found.
                   </td>
                 </tr>
@@ -613,6 +688,7 @@ export function LoanTable({loanType, rows, count}: Props) {
                   <td className="px-3 py-2">TOTAL</td>
                   <td className="px-3 py-2"></td>
                   <td className="px-3 py-2"></td>
+                  {isElectronics ? <td className="px-3 py-2"></td> : null}
                   <td className="px-3 py-2 hidden lg:table-cell"></td>
                   <td className="px-3 py-2 hidden lg:table-cell">
                     {currency.format(totals.interest)}
@@ -646,6 +722,22 @@ export function LoanTable({loanType, rows, count}: Props) {
         />
       )}
 
+      {statementLoan ? (
+        <LoanStatementDialog
+          loan={statementLoan}
+          onClose={() => setStatementLoan(null)}
+        />
+      ) : null}
+
+      {docsLoan ? (
+        <MemberDocumentsDialog
+          memberId={docsLoan.memberId}
+          memberName={docsLoan.memberName}
+          loanId={docsLoan.id}
+          onClose={() => setDocsLoan(null)}
+        />
+      ) : null}
+
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Confirm Deletion"
@@ -664,7 +756,11 @@ export function LoanTable({loanType, rows, count}: Props) {
           }
           setDeleting(true);
           startTransition(async () => {
-            await deleteLoanAction(deleteTarget.id);
+            const result = await deleteLoanAction(deleteTarget.id);
+            if (!result.error) {
+              setSuccessMessage('Loan deleted successfully.');
+              setTimeout(() => setSuccessMessage(''), 4000);
+            }
             setDeleting(false);
             setDeleteTarget(null);
           });

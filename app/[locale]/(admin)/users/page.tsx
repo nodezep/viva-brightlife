@@ -18,6 +18,18 @@ type AuditLogRow = {
   created_at: string;
 };
 
+type ActivityLogRow = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
+
 export default async function UsersPage() {
   const supabase = createClient();
   const {
@@ -56,10 +68,17 @@ export default async function UsersPage() {
     .order('created_at', {ascending: false})
     .limit(100);
 
+  const {data: activityLogs} = await supabase
+    .from('activity_logs')
+    .select('id,actor_id,action,entity,entity_id,metadata,ip,user_agent,created_at')
+    .order('created_at', {ascending: false})
+    .limit(200);
+
   return (
     <UserManagementModule
       initialUsers={(users ?? []) as ProfileRow[]}
       initialAuditLogs={(logs ?? []) as AuditLogRow[]}
+      initialActivityLogs={(activityLogs ?? []) as ActivityLogRow[]}
     />
   );
 }

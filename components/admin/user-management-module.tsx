@@ -15,6 +15,7 @@ type UserRow = {
 type Props = {
   initialUsers: UserRow[];
   initialAuditLogs?: AuditLog[];
+  initialActivityLogs?: ActivityLog[];
 };
 
 type AuditLog = {
@@ -26,12 +27,26 @@ type AuditLog = {
   created_at: string;
 };
 
+type ActivityLog = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
+
 export function UserManagementModule({
   initialUsers,
-  initialAuditLogs = []
+  initialAuditLogs = [],
+  initialActivityLogs = []
 }: Props) {
   const [users, setUsers] = useState<UserRow[]>(initialUsers);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(initialAuditLogs);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialActivityLogs);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('manager');
@@ -148,6 +163,17 @@ export function UserManagementModule({
     const result = await response.json();
     if (result.logs) {
       setAuditLogs(result.logs as AuditLog[]);
+    }
+  };
+
+  const refreshActivityLogs = async () => {
+    const response = await fetch('/api/admin/activity/audit');
+    if (!response.ok) {
+      return;
+    }
+    const result = await response.json();
+    if (result.logs) {
+      setActivityLogs(result.logs as ActivityLog[]);
     }
   };
 
@@ -368,6 +394,56 @@ export function UserManagementModule({
                 <tr>
                   <td className="px-3 py-6 text-center text-muted-foreground" colSpan={4}>
                     No audit logs yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Activity Log</h2>
+          <button
+            type="button"
+            className="rounded-md border px-3 py-1.5 text-xs"
+            onClick={() => void refreshActivityLogs()}
+          >
+            Refresh
+          </button>
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-[900px] w-full text-sm">
+            <thead className="bg-muted/70 text-left">
+              <tr>
+                <th className="px-3 py-2">When</th>
+                <th className="px-3 py-2">Actor</th>
+                <th className="px-3 py-2">Entity</th>
+                <th className="px-3 py-2">Action</th>
+                <th className="px-3 py-2">Target</th>
+                <th className="px-3 py-2">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activityLogs.map((log) => (
+                <tr key={log.id} className="border-t">
+                  <td className="px-3 py-2">
+                    {log.created_at ? log.created_at.replace('T', ' ').slice(0, 19) : '-'}
+                  </td>
+                  <td className="px-3 py-2">{log.actor_id ?? '-'}</td>
+                  <td className="px-3 py-2">{log.entity}</td>
+                  <td className="px-3 py-2">{log.action}</td>
+                  <td className="px-3 py-2">{log.entity_id ?? '-'}</td>
+                  <td className="px-3 py-2">
+                    {log.metadata ? JSON.stringify(log.metadata) : '-'}
+                  </td>
+                </tr>
+              ))}
+              {activityLogs.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-6 text-center text-muted-foreground" colSpan={6}>
+                    No activity logs yet.
                   </td>
                 </tr>
               ) : null}

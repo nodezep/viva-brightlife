@@ -12,8 +12,10 @@ export type LoanStatus = 'active' | 'closed' | 'defaulted' | 'pending';
 
 export type LoanRecord = {
   id: string;
+  memberId: string;
   memberNumber: string;
   memberName: string;
+  itemDescription?: string | null;
   cycle: number;
   securityAmount: number;
   loanNumber: string;
@@ -24,7 +26,7 @@ export type LoanRecord = {
   overdueAmount: number;
   status: LoanStatus;
   loanType: LoanType;
-  repaymentFrequency?: 'weekly' | 'daily';
+  repaymentFrequency?: 'weekly' | 'daily' | 'monthly';
   durationMonths?: number;
   amountPaid?: number;
   memberPhone?: string | null;
