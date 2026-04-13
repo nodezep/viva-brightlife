@@ -4,7 +4,7 @@ import {useTransition, useState} from 'react';
 import {useTranslations} from 'next-intl';
 import {createLoanAction} from '@/lib/actions/loan';
 import type {LoanType} from '@/types';
-import type {GroupMemberDetail} from '@/lib/data';
+import type {GroupMemberDetail} from '@/types';
 
 type Props = {
   groupId: string;

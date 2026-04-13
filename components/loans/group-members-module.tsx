@@ -3,7 +3,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {ArrowLeft, Download, Plus, Printer, Trash2} from 'lucide-react';
 import {useRouter} from '@/lib/navigation';
-import type {GroupDetail, GroupMemberDetail} from '@/lib/data';
+import type {GroupDetail, GroupMemberDetail} from '@/types';
 import type {LoanRecord} from '@/types';
 import {LoanTable} from './loan-table';
 import {GroupLoanFormDialog} from './group-loan-form-dialog';

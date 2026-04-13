@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useMemo, useState, useTransition} from 'react';
-import type {AdmissionBookRow, AdmissionGroup} from '@/lib/data';
+import type {AdmissionBookRow, AdmissionGroup} from '@/types';
 import {createClient} from '@/lib/supabase/client';
 
 type Props = {

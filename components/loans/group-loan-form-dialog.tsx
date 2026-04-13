@@ -2,7 +2,7 @@
 
 import {useEffect, useState} from 'react';
 import {Plus} from 'lucide-react';
-import type {GroupMemberDetail} from '@/lib/data';
+import type {GroupMemberDetail} from '@/types';
 import {createClient} from '@/lib/supabase/client';
 import {GroupLoanForm} from './group-loan-form';
 

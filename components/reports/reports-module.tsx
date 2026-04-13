@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import {useMemo, useState} from 'react';
 import {
@@ -9,8 +9,7 @@ import {
   PieChart
 } from 'lucide-react';
 import {useTranslations} from 'next-intl';
-import type {LoanRecord} from '@/types';
-import type {MarejeshoRow} from '@/lib/data';
+import type {LoanRecord, MarejeshoRow} from '@/types';
 
 const reportTypes = [
   'monthly_collection',

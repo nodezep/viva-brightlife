@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {Plus} from 'lucide-react';
-import type {GroupView} from '@/lib/data';
+import type {GroupView} from '@/types';
 
 type Props = {
   initialGroups: GroupView[];

@@ -8,6 +8,7 @@ import {
   formatDateOnlyFromUtc,
   toUtcDate
 } from '@/lib/date-only';
+import {checkAndExtendLoanIfOverdue} from './loan-utils';
 
 const getDefaultReturnStartDate = (
   disbursementDate: string,
@@ -95,7 +96,7 @@ export async function getLoanSchedulesAction(loanId: string) {
 
   const {data: loanRow, error: loanError} = await supabase
     .from('loans')
-    .select('loan_type, disbursement_date, duration_months, weekly_installment')
+    .select('loan_type, disbursement_date, duration_months, weekly_installment, status')
     .eq('id', loanId)
     .single();
 
@@ -150,84 +151,100 @@ export async function getLoanSchedulesAction(loanId: string) {
     .eq('loan_id', loanId)
     .order('week_number', {ascending: true});
 
-  if (refreshError) {
-    return data;
+  if (loanRow.loan_type === 'binafsi' && loanRow.status === 'active') {
+    await checkAndExtendLoanIfOverdue(loanId);
+    
+    // Re-fetch to get any newly created schedules
+    const {data: refreshed, error: refreshError} = await supabase
+      .from('loan_schedules')
+      .select('*')
+      .eq('loan_id', loanId)
+      .order('week_number', {ascending: true});
+      
+    if (refreshError || !refreshed) {
+      return data;
+    }
+    return refreshed;
   }
 
-  return freshSchedules;
+  return freshSchedules || data;
 }
 
-export async function updateScheduleStatusAction(scheduleId: string, status: string) {
-  const supabase = createClient();
-  const {data: existing, error: fetchError} = await supabase
-    .from('loan_schedules')
-    .select('loan_id, paid_amount, expected_amount, expected_date, week_number, status')
-    .eq('id', scheduleId)
-    .single();
-
-  if (fetchError || !existing) {
-    return { error: fetchError?.message || 'Schedule not found' };
-  }
-
-  if (status === 'paid') {
-    const {data: previous, error: prevError} = await supabase
+export async function updateScheduleStatusAction(
+  scheduleId: string,
+  newStatus: string,
+  paymentAmount?: number
+) {
+  try {
+    const supabase = createClient();
+    
+    // 1. Get current schedule and loan info
+    const {data: existing, error: fetchErr} = await supabase
       .from('loan_schedules')
-      .select('id, status')
-      .eq('loan_id', existing.loan_id)
-      .lt('week_number', existing.week_number)
-      .order('week_number', {ascending: false})
-      .limit(1)
-      .maybeSingle();
-
-    if (prevError) {
-      return {error: prevError.message};
-    }
-
-    if (previous && previous.status !== 'paid') {
-      return {error: 'Please mark the previous installment before this one.'};
-    }
-  }
-
-  const newPaidAmount = status === 'paid' ? Number(existing.expected_amount ?? 0) : 0;
-
-  const {error} = await supabase
-    .from('loan_schedules')
-    .update({status, paid_amount: newPaidAmount})
-    .eq('id', scheduleId);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  const oldPaid = Number(existing.paid_amount ?? 0);
-  const delta = newPaidAmount - oldPaid;
-
-  if (delta !== 0) {
-    const {data: loanRow, error: loanError} = await supabase
-      .from('loans')
-      .select('outstanding_balance')
-      .eq('id', existing.loan_id)
+      .select('*, loans!inner(id, outstanding_balance, status, loan_type)')
+      .eq('id', scheduleId)
       .single();
 
-    if (loanError || !loanRow) {
-      return { error: loanError?.message || 'Loan not found' };
+    if (fetchErr || !existing) {
+      throw new Error('Schedule not found');
     }
 
-    const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
-    const newOutstanding = currentOutstanding - delta;
+    const loanRow = existing.loans as any;
+    const currentPaid = Number(existing.paid_amount ?? 0);
+    
+    // If paymentAmount is provided, we use it. Otherwise assume full expected amount.
+    const targetPaid = paymentAmount !== undefined ? paymentAmount : Number(existing.expected_amount ?? 0);
+    const delta = targetPaid - currentPaid;
 
-    const {error: updateLoanError} = await supabase
-      .from('loans')
-      .update({outstanding_balance: newOutstanding})
-      .eq('id', existing.loan_id);
+    // 2. Update Schedule
+    const {error: updateErr} = await supabase
+      .from('loan_schedules')
+      .update({
+        status: newStatus,
+        paid_amount: targetPaid,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', scheduleId);
 
-    if (updateLoanError) {
-      return { error: updateLoanError.message };
+    if (updateErr) throw updateErr;
+
+    // 3. Record Transaction
+    if (delta !== 0) {
+      await supabase.from('loan_transactions').insert({
+        loan_id: existing.loan_id,
+        schedule_id: scheduleId,
+        amount: Math.abs(delta),
+        transaction_date: new Date().toISOString().split('T')[0],
+        type: delta > 0 ? 'payment' : 'reversal',
+        notes: delta > 0 
+          ? `Payment for period ${existing.week_number} (${targetPaid === existing.expected_amount ? 'Full' : 'Partial'})` 
+          : 'Payment reversed'
+      });
+
+      // 4. Update Loan Balance
+      const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
+      const newOutstanding = Math.max(0, currentOutstanding - delta);
+
+      const updatePayload: any = { outstanding_balance: newOutstanding };
+      
+      // Auto-close if fully paid
+      if (newOutstanding <= 0) {
+        updatePayload.status = 'closed';
+      } else if (loanRow.status === 'closed' && newOutstanding > 0) {
+        updatePayload.status = 'active'; // Re-open if reversal happens
+      }
+
+      await supabase
+        .from('loans')
+        .update(updatePayload)
+        .eq('id', existing.loan_id);
     }
+
+    revalidatePath('/', 'layout');
+    return {success: true};
+  } catch (error: any) {
+    return {success: false, error: error.message || 'Failed to update status'};
   }
-
-  revalidatePath('/', 'layout');
-  return { success: true };
 }
 
 export async function regenerateLoanSchedulesAction(loanId: string) {

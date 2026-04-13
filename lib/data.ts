@@ -1,5 +1,20 @@
 import {createClient} from '@/lib/supabase/server';
-import type {LoanRecord, LoanType} from '@/types';
+import type {
+  LoanRecord,
+  LoanType,
+  MarejeshoRow,
+  MarejeshoSchedule,
+  LoanStatus,
+  GroupView,
+  GroupSummary,
+  GroupMemberDetail,
+  GroupDetail,
+  MemberOption,
+  AdmissionBookRow,
+  AdmissionGroup,
+  InsuranceView
+} from '@/types';
+import {checkAndExtendLoanIfOverdue} from './actions/loan-utils';
 import {addMonthsToDateOnly} from '@/lib/date-only';
 
 type LoanRow = {
@@ -138,7 +153,7 @@ function toLoanRecord(row: LoanRow): LoanRecord {
     installmentSize: Number(row.weekly_installment ?? 0),
     outstandingBalance: Number(row.outstanding_balance ?? 0),
     overdueAmount: Number(row.overdue_amount ?? 0),
-    status: row.status,
+    status: row.status as any,
     loanType: row.loan_type,
     repaymentFrequency: (row.repayment_frequency ?? 'weekly') as
       | 'weekly'
@@ -353,26 +368,7 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
   });
 }
 
-export type MarejeshoSchedule = {
-  expectedDate: string;
-  expectedAmount: number;
-  paidAmount: number;
-};
-
-export type MarejeshoRow = {
-  id: string;
-  memberNumber: string;
-  memberName: string;
-  loanNumber: string;
-  loanType: LoanType;
-  cycle: number;
-  securityAmount: number;
-  disbursementDate: string;
-  installmentAmount: number;
-  outstandingBalance: number;
-  status: 'active' | 'closed' | 'defaulted' | 'pending';
-  schedules: MarejeshoSchedule[];
-};
+// Marejesho types moved to types/index.ts
 
 type MarejeshoRowRaw = {
   id: string;
@@ -419,12 +415,13 @@ export async function getMarejeshoReportRows(): Promise<MarejeshoRow[]> {
       disbursementDate: row.disbursement_date,
       installmentAmount: Number(row.weekly_installment ?? 0),
       outstandingBalance: Number(row.outstanding_balance ?? 0),
-      status: row.status,
-      schedules: (row.loan_schedules ?? []).map((s) => ({
+      overdueAmount: 0,
+      status: row.status as LoanStatus,
+      schedules: (row.loan_schedules as any[] | null)?.map((s) => ({
         expectedDate: s.expected_date,
         expectedAmount: Number(s.expected_amount ?? 0),
         paidAmount: Number(s.paid_amount ?? 0)
-      }))
+      })) ?? []
     };
   });
 }
@@ -676,12 +673,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
   };
 }
 
-export type GroupView = {
-  id: string;
-  name: string;
-  number: string;
-  members: string[];
-};
+// GroupView moved to @/types/index.ts
 
 type GroupRelationRow = {
   members: {full_name: string} | {full_name: string}[] | null;
@@ -701,6 +693,8 @@ export async function getGroupsWithMembers(): Promise<GroupView[]> {
     id: group.id,
     name: group.group_name,
     number: group.group_number,
+    groupName: group.group_name,
+    groupNumber: group.group_number,
     members:
       (group.group_members as unknown as GroupRelationRow[] | null)
         ?.map((row) => pickSingleRelation(row.members)?.full_name)
@@ -708,40 +702,7 @@ export async function getGroupsWithMembers(): Promise<GroupView[]> {
   }));
 }
 
-export type GroupSummary = {
-  id: string;
-  groupName: string;
-  groupNumber: string;
-  groupType: string;
-  createdAt: string;
-  memberCount: number;
-};
-
-export type GroupMemberDetail = {
-  id: string;
-  memberId: string;
-  memberNumber: string;
-  fullName: string;
-  phone: string | null;
-  roleInGroup: string | null;
-  hasBook: boolean;
-};
-
-export type GroupDetail = {
-  id: string;
-  groupName: string;
-  groupNumber: string;
-  groupType: string;
-  createdAt: string;
-  members: GroupMemberDetail[];
-};
-
-export type MemberOption = {
-  id: string;
-  memberNumber: string;
-  fullName: string;
-  phone: string | null;
-};
+// Group types moved to @/types/index.ts
 
 export async function getGroupsSummary(): Promise<GroupSummary[]> {
   const supabase = createClient();
@@ -756,6 +717,8 @@ export async function getGroupsSummary(): Promise<GroupSummary[]> {
 
   return data.map((group) => ({
     id: group.id,
+    name: group.group_name,
+    number: group.group_number,
     groupName: group.group_name,
     groupNumber: group.group_number,
     groupType: group.group_type,
@@ -904,22 +867,7 @@ export async function getLoansByGroup(groupId: string): Promise<LoanRecord[]> {
   });
 }
 
-export type AdmissionBookRow = {
-  groupId: string;
-  groupName: string;
-  groupNumber: string;
-  memberId: string;
-  memberNumber: string;
-  fullName: string;
-  phone: string | null;
-  hasBook: boolean;
-};
-
-export type AdmissionGroup = {
-  id: string;
-  name: string;
-  number: string;
-};
+// Admission types moved to @/types/index.ts
 
 export async function getAdmissionGroups(): Promise<AdmissionGroup[]> {
   const supabase = createClient();
@@ -992,16 +940,7 @@ export async function getAdmissionBookRows(): Promise<AdmissionBookRow[]> {
   }));
 }
 
-export type InsuranceView = {
-  id: string;
-  policyNumber: string;
-  memberName: string;
-  policyType: string;
-  premium: number;
-  coverage: number;
-  endDate: string;
-  status: string;
-};
+// InsuranceView moved to types/index.ts
 
 type InsuranceRow = {
   id: string;

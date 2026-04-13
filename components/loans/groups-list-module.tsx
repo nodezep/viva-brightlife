@@ -1,9 +1,9 @@
-﻿'use client';
+'use client';
 
 import {useState} from 'react';
 import {Plus, Trash2} from 'lucide-react';
 import {Link} from '@/lib/navigation';
-import type {GroupSummary} from '@/lib/data';
+import type {GroupSummary} from '@/types';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 import {useProfile} from '@/lib/hooks/use-profile';
 
@@ -58,6 +58,8 @@ export function GroupsListModule({initialGroups}: Props) {
     setGroups((current) => [
       {
         id: created.id,
+        name: created.group_name,
+        number: created.group_number,
         groupName: created.group_name,
         groupNumber: created.group_number,
         groupType: created.group_type,

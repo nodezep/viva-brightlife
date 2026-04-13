@@ -1,7 +1,7 @@
 'use client';
 
 import {Bell, Plus} from 'lucide-react';
-import type {InsuranceView} from '@/lib/data';
+import type {InsuranceView} from '@/types';
 
 type Props = {
   initialPolicies: InsuranceView[];
