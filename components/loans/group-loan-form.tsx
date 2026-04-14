@@ -22,12 +22,16 @@ export function GroupLoanForm({groupId, members, onClose, onSuccess}: Props) {
 
   const [totalRepay, setTotalRepay] = useState('');
   const [installment, setInstallment] = useState('');
+  const [returnStartDate, setReturnStartDate] = useState('');
 
   const handleSubmit = (formData: FormData) => {
     setError(null);
     formData.append('loanType', 'vikundi_wakinamama' as LoanType);
     formData.append('groupId', groupId);
     formData.append('repaymentFrequency', 'weekly');
+    if (returnStartDate) {
+      formData.append('returnStartDate', returnStartDate);
+    }
 
     startTransition(async () => {
       const result = await createLoanAction(formData);
@@ -42,88 +46,126 @@ export function GroupLoanForm({groupId, members, onClose, onSuccess}: Props) {
 
   return (
     <form
-      className="no-print grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-3"
+      className="no-print grid gap-4 rounded-xl border bg-card p-5 md:grid-cols-3"
       action={handleSubmit}
     >
-      <select
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm md:col-span-3"
-        value={selectedMemberId}
-        onChange={(e) => setSelectedMemberId(e.target.value)}
-        name="memberId"
-      >
-        <option value="">Select member</option>
-        {eligibleMembers.map((member) => (
-          <option key={member.memberId} value={member.memberId}>
-            {member.memberNumber} - {member.fullName} {member.phone ? `(${member.phone})` : ''}
-          </option>
-        ))}
-      </select>
+      <div className="md:col-span-3 space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Member Selection</p>
+        <select
+          required
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          value={selectedMemberId}
+          onChange={(e) => setSelectedMemberId(e.target.value)}
+          name="memberId"
+        >
+          <option value="">Select member</option>
+          {eligibleMembers.map((member) => (
+            <option key={member.memberId} value={member.memberId}>
+              {member.memberNumber} - {member.fullName} {member.phone ? `(${member.phone})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {eligibleMembers.length === 0 ? (
         <p className="md:col-span-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
           No members approved in the Admission Book for this group yet.
         </p>
       ) : null}
 
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.loan_number') || 'Loan Number'}
-        name="loanNumber"
-      />
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.disbursement_amount') || 'Disbursement Amount'}
-        name="disbursementAmount"
-      />
-      <input
-        required
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        name="disbursementDate"
-      />
-      <input
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.security_amount') || 'Security Amount'}
-        name="securityAmount"
-      />
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.cycle') || 'Cycle'}
-        name="cycle"
-        defaultValue={1}
-      />
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Loan Number</p>
+        <input
+          required
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="loanNumber"
+        />
+      </div>
 
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder="Total Expected Repayment (OS Balance)"
-        name="outstandingBalance"
-        value={totalRepay}
-        onChange={(e) => setTotalRepay(e.target.value)}
-      />
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.installment_size') || 'Installment Size'}
-        name="installmentSize"
-        value={installment}
-        onChange={(e) => setInstallment(e.target.value)}
-      />
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Disbursement Amount</p>
+        <input
+          required
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="disbursementAmount"
+        />
+      </div>
 
-      <input
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.overdue_od') || 'Overdue OD'}
-        name="overdueAmount"
-      />
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Security Amount</p>
+        <input
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="securityAmount"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Disbursement Date</p>
+        <input
+          required
+          type="date"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="disbursementDate"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Return Start Date</p>
+        <input
+          required
+          type="date"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="returnStartDate"
+          value={returnStartDate}
+          onChange={(e) => setReturnStartDate(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Cycle</p>
+        <input
+          required
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="cycle"
+          defaultValue={1}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Total Expected Repayment</p>
+        <input
+          required
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="outstandingBalance"
+          value={totalRepay}
+          onChange={(e) => setTotalRepay(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Installment Size</p>
+        <input
+          required
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="installmentSize"
+          value={installment}
+          onChange={(e) => setInstallment(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Overdue OD</p>
+        <input
+          type="number"
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          name="overdueAmount"
+        />
+      </div>
 
       {error ? (
         <p className="md:col-span-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">

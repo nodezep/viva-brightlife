@@ -48,3 +48,34 @@ export async function DELETE(
 
   return NextResponse.json({ok: true});
 }
+
+export async function PATCH(
+  request: Request,
+  {params}: {params: {groupId: string}}
+) {
+  const supabase = createClient();
+  const {data: {user}, error: authError} = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({error: 'Unauthorized'}, {status: 401});
+  }
+
+  const {groupName, groupNumber} = await request.json();
+
+  if (!groupName || !groupNumber) {
+    return NextResponse.json({error: 'Name and Number are required'}, {status: 400});
+  }
+
+  const {data, error} = await supabase
+    .from('groups')
+    .update({group_name: groupName, group_number: groupNumber})
+    .eq('id', params.groupId)
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({error: error.message}, {status: 400});
+  }
+
+  return NextResponse.json({group: data});
+}

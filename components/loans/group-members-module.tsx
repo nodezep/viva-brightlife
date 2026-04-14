@@ -690,36 +690,36 @@ export function GroupMembersModule({group, loans}: Props) {
                   <tr className="border-t bg-muted/40">
                     <td className="px-3 py-2 text-sm text-muted-foreground">New</td>
                     <td className="px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Number</p>
                       <input
                         className="w-full rounded-md border bg-background px-2 py-1 text-sm"
                         value={newMemberNumber}
                         onChange={(e) => setNewMemberNumber(e.target.value)}
-                        placeholder="e.g. M-001"
                       />
                     </td>
                     <td className="px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Name</p>
                       <input
                         className="w-full rounded-md border bg-background px-2 py-1 text-sm"
                         value={newMemberName}
                         onChange={(e) => setNewMemberName(e.target.value)}
-                        placeholder="Member name"
                         required
                       />
                     </td>
                     <td className="px-3 py-2 hidden md:table-cell">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Phone</p>
                       <input
                         className="w-full rounded-md border bg-background px-2 py-1 text-sm"
                         value={newMemberPhone}
                         onChange={(e) => setNewMemberPhone(e.target.value)}
-                        placeholder="Phone"
                       />
                     </td>
                     <td className="px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Role</p>
                       <input
                         className="w-full rounded-md border bg-background px-2 py-1 text-sm"
                         value={newMemberRole}
                         onChange={(e) => setNewMemberRole(e.target.value)}
-                        placeholder="Role"
                       />
                     </td>
                     <td className="px-3 py-2">

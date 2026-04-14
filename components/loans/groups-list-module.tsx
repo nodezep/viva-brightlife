@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import {Plus, Trash2} from 'lucide-react';
+import {Plus, Trash2, Edit2, X} from 'lucide-react';
 import {Link} from '@/lib/navigation';
 import type {GroupSummary} from '@/types';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
@@ -22,14 +22,25 @@ export function GroupsListModule({initialGroups}: Props) {
   const [deleteTarget, setDeleteTarget] = useState<GroupSummary | null>(null);
   const {profile} = useProfile();
   const [permissionError, setPermissionError] = useState('');
+  const [editingGroup, setEditingGroup] = useState<GroupSummary | null>(null);
 
-  const createGroup = async (event: React.FormEvent<HTMLFormElement>) => {
+  const clearForm = () => {
+    setGroupName('');
+    setGroupNumber('');
+    setEditingGroup(null);
+    setError('');
+  };
+
+  const saveGroup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     setError('');
 
-    const response = await fetch('/api/groups', {
-      method: 'POST',
+    const url = editingGroup ? `/api/groups/${editingGroup.id}` : '/api/groups';
+    const method = editingGroup ? 'PATCH' : 'POST';
+
+    const response = await fetch(url, {
+      method,
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({groupName, groupNumber})
     });
@@ -42,12 +53,12 @@ export function GroupsListModule({initialGroups}: Props) {
           ? result.error
           : result.error?.message ??
             (result.error ? JSON.stringify(result.error) : null);
-      setError(message ?? 'Failed to create group');
+      setError(message ?? `Failed to ${editingGroup ? 'update' : 'create'} group`);
       setSubmitting(false);
       return;
     }
 
-    const created = result.group as {
+    const saved = result.group as {
       id: string;
       group_name: string;
       group_number: string;
@@ -55,22 +66,37 @@ export function GroupsListModule({initialGroups}: Props) {
       created_at: string;
     };
 
-    setGroups((current) => [
-      {
-        id: created.id,
-        name: created.group_name,
-        number: created.group_number,
-        groupName: created.group_name,
-        groupNumber: created.group_number,
-        groupType: created.group_type,
-        createdAt: created.created_at,
-        memberCount: 0
-      },
-      ...current
-    ]);
+    if (editingGroup) {
+      setGroups((current) =>
+        current.map((g) =>
+          g.id === saved.id
+            ? {
+                ...g,
+                name: saved.group_name,
+                number: saved.group_number,
+                groupName: saved.group_name,
+                groupNumber: saved.group_number
+              }
+            : g
+        )
+      );
+    } else {
+      setGroups((current) => [
+        {
+          id: saved.id,
+          name: saved.group_name,
+          number: saved.group_number,
+          groupName: saved.group_name,
+          groupNumber: saved.group_number,
+          groupType: saved.group_type,
+          createdAt: saved.created_at,
+          memberCount: 0
+        },
+        ...current
+      ]);
+    }
 
-    setGroupName('');
-    setGroupNumber('');
+    clearForm();
     setSubmitting(false);
   };
 
@@ -102,32 +128,56 @@ export function GroupsListModule({initialGroups}: Props) {
     setDeletingGroupId(null);
   };
 
+  const startEditing = (group: GroupSummary) => {
+    setEditingGroup(group);
+    setGroupName(group.groupName ?? group.name);
+    setGroupNumber(group.groupNumber ?? group.number);
+    setError('');
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  };
+
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-semibold">Mikopo ya Vikundi vya Wakina Mama</h1>
 
-      <form onSubmit={createGroup} className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-3">
-        <input
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          placeholder="Group Name"
-          value={groupName}
-          onChange={(e) => setGroupName(e.target.value)}
-          required
-        />
-        <input
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          placeholder="Group Number"
-          value={groupNumber}
-          onChange={(e) => setGroupNumber(e.target.value)}
-          required
-        />
-        <button
-          type="submit"
-          disabled={submitting}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-        >
-          <Plus size={16} /> {submitting ? 'Saving...' : 'Add Group'}
-        </button>
+      <form onSubmit={saveGroup} className="grid gap-4 rounded-xl border bg-card p-5 md:grid-cols-3">
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Group Name</p>
+          <input
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">Group Number</p>
+          <input
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            value={groupNumber}
+            onChange={(e) => setGroupNumber(e.target.value)}
+            required
+          />
+        </div>
+        <div className="flex items-end gap-2 pb-[2px]">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex h-[38px] flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          >
+            {editingGroup ? <Edit2 size={16} /> : <Plus size={16} />}
+            {submitting ? 'Saving...' : editingGroup ? 'Update Group' : 'Add Group'}
+          </button>
+          {editingGroup && (
+            <button
+              type="button"
+              onClick={clearForm}
+              className="inline-flex h-[38px] items-center justify-center rounded-lg border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
         {error ? (
           <p className="md:col-span-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         ) : null}
@@ -170,6 +220,14 @@ export function GroupsListModule({initialGroups}: Props) {
                     >
                       Open Group
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => startEditing(group)}
+                      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors hover:bg-muted"
+                    >
+                      <Edit2 size={12} />
+                      Edit
+                    </button>
                     <button
                       type="button"
                       disabled={deletingGroupId === group.id || (profile?.role && profile.role !== 'admin')}

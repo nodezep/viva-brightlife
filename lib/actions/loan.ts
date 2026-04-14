@@ -260,8 +260,17 @@ export async function createLoanAction(formData: FormData) {
     // Calculate monthly installment (total repayment divided by months)
     const monthlyInstallment = installmentSize / durationMonths;
 
+    const firstReturnDate =
+      returnStartDateRaw && returnStartDateRaw.trim()
+        ? returnStartDateRaw
+        : addMonthsToDateOnly(disbursementDate, 1);
+
     for (let month = 1; month <= durationMonths; month++) {
-      const expectedDate = addMonthsToDateOnly(disbursementDate, month);
+      const expectedDate =
+        month === 1
+          ? firstReturnDate
+          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, month - 1);
+
       if (!expectedDate) {
         continue;
       }
@@ -390,21 +399,21 @@ export async function updateLoanAction(formData: FormData) {
     overdue_amount: overdueAmount
   };
 
+  updatePayload.repayment_frequency = repaymentFrequency;
+  const defaultReturnStart = getDefaultReturnStartDate(
+    disbursementDate,
+    repaymentFrequency
+  );
+  updatePayload.return_start_date =
+    returnStartDateRaw && returnStartDateRaw.trim()
+      ? returnStartDateRaw
+      : defaultReturnStart;
+
   if (loanType === 'binafsi') {
     updatePayload.duration_months = durationMonths;
     updatePayload.amount_withdrawn = amountPaid;
     updatePayload.interest_rate = interestRatePercent;
     updatePayload.days_overdue = daysOverdue;
-  } else {
-    updatePayload.repayment_frequency = repaymentFrequency;
-    const defaultReturnStart = getDefaultReturnStartDate(
-      disbursementDate,
-      repaymentFrequency
-    );
-    updatePayload.return_start_date =
-      returnStartDateRaw && returnStartDateRaw.trim()
-        ? returnStartDateRaw
-        : defaultReturnStart;
   }
   
   if (loanType === 'electronics') {
@@ -500,8 +509,17 @@ export async function updateLoanAction(formData: FormData) {
     // Calculate monthly installment (total repayment divided by months)
     const monthlyInstallment = installmentSize / durationMonths;
 
+    const firstReturnDate =
+      returnStartDateRaw && returnStartDateRaw.trim()
+        ? returnStartDateRaw
+        : addMonthsToDateOnly(disbursementDate, 1);
+
     for (let month = 1; month <= durationMonths; month++) {
-      const expectedDate = addMonthsToDateOnly(disbursementDate, month);
+      const expectedDate =
+        month === 1
+          ? firstReturnDate
+          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, month - 1);
+
       if (!expectedDate) {
         continue;
       }
