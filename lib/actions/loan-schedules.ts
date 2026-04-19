@@ -181,7 +181,7 @@ export async function updateScheduleStatusAction(
     // 1. Get current schedule and loan info
     const {data: existing, error: fetchErr} = await supabase
       .from('loan_schedules')
-      .select('*, loans!inner(id, outstanding_balance, status, loan_type)')
+      .select('*, loans!inner(id, outstanding_balance, status, loan_type, amount_withdrawn)')
       .eq('id', scheduleId)
       .single();
 
@@ -190,11 +190,11 @@ export async function updateScheduleStatusAction(
     }
 
     const loanRow = existing.loans as any;
-    const currentPaid = Number(existing.paid_amount ?? 0);
+    const currentPaidScroll = Number(existing.paid_amount ?? 0);
     
     // If paymentAmount is provided, we use it. Otherwise assume full expected amount.
     const targetPaid = paymentAmount !== undefined ? paymentAmount : Number(existing.expected_amount ?? 0);
-    const delta = targetPaid - currentPaid;
+    const delta = targetPaid - currentPaidScroll;
 
     // 2. Update Schedule
     const {error: updateErr} = await supabase
@@ -221,11 +221,17 @@ export async function updateScheduleStatusAction(
           : 'Payment reversed'
       });
 
-      // 4. Update Loan Balance
+      // 4. Update Loan Balance and Total Paid
       const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
       const newOutstanding = Math.max(0, currentOutstanding - delta);
+      
+      const currentTotalPaid = Number(loanRow.amount_withdrawn ?? 0);
+      const newTotalPaid = currentTotalPaid + delta;
 
-      const updatePayload: any = { outstanding_balance: newOutstanding };
+      const updatePayload: any = { 
+        outstanding_balance: newOutstanding,
+        amount_withdrawn: newTotalPaid
+      };
       
       // Auto-close if fully paid
       if (newOutstanding <= 0) {

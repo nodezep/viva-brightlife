@@ -3,7 +3,16 @@
 import {useRouter, useSearchParams, usePathname} from 'next/navigation';
 import {Search} from 'lucide-react';
 import {useTranslations} from 'next-intl';
-import {useCallback, useTransition, useState} from 'react';
+import {useCallback, useTransition, useState, type ReactNode} from 'react';
+
+const Field = ({label, children}: {label: string; children: ReactNode}) => (
+  <div className="relative">
+    {children}
+    <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-sm peer-placeholder-shown:font-normal peer-placeholder-shown:text-muted-foreground peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+      {label}
+    </label>
+  </div>
+);
 
 type Props = {
   defaultSort?: string;
@@ -51,46 +60,51 @@ export function LoanFilters({defaultSort = 'newest'}: Props) {
         isPending ? 'opacity-50' : ''
       }`}
     >
-      <label className="relative sm:col-span-2 md:col-span-2">
-        <Search className="pointer-events-none absolute left-3 top-2.5" size={16} />
+      <div className="relative sm:col-span-2 md:col-span-2">
         <input
-          className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm"
-          placeholder={t('loan.search_placeholder')}
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 pl-9 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             applyFilters(e.target.value, startDate, endDate, sort);
           }}
         />
-      </label>
-      <label className="grid gap-1">
-        <span className="text-xs font-semibold text-muted-foreground">Start</span>
+        <Search className="pointer-events-none absolute left-3 top-3 text-muted-foreground transition-all peer-focus:text-primary" size={16} />
+        <label className="pointer-events-none absolute left-9 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-sm peer-placeholder-shown:font-normal peer-placeholder-shown:text-muted-foreground peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+          {t('loan.search_placeholder')}
+        </label>
+      </div>
+
+      <Field label="Start Date">
         <input
           type="date"
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={startDate}
           onChange={(e) => {
             setStartDate(e.target.value);
             applyFilters(query, e.target.value, endDate, sort);
           }}
         />
-      </label>
-      <label className="grid gap-1">
-        <span className="text-xs font-semibold text-muted-foreground">End</span>
+      </Field>
+
+      <Field label="End Date">
         <input
           type="date"
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={endDate}
           onChange={(e) => {
             setEndDate(e.target.value);
             applyFilters(query, startDate, e.target.value, sort);
           }}
         />
-      </label>
-      <label className="grid gap-1 sm:col-span-2 md:col-span-1">
-        <span className="text-xs font-semibold text-muted-foreground">Sort</span>
+      </Field>
+
+      <div className="relative sm:col-span-2 md:col-span-1">
         <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
           value={sort}
           onChange={(e) => {
             setSort(e.target.value);
@@ -104,7 +118,10 @@ export function LoanFilters({defaultSort = 'newest'}: Props) {
           <option value="name_asc">Name (A-Z)</option>
           <option value="name_desc">Name (Z-A)</option>
         </select>
-      </label>
+        <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+          Sort By
+        </label>
+      </div>
     </div>
   );
 }

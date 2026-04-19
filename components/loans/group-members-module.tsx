@@ -20,6 +20,7 @@ import {
   toUtcDate
 } from '@/lib/date-only';
 import {createClient} from '@/lib/supabase/client';
+import {Field} from '../ui/field';
 
 type Props = {
   group: GroupDetail;
@@ -690,37 +691,45 @@ export function GroupMembersModule({group, loans}: Props) {
                   <tr className="border-t bg-muted/40">
                     <td className="px-3 py-2 text-sm text-muted-foreground">New</td>
                     <td className="px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Number</p>
-                      <input
-                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-                        value={newMemberNumber}
-                        onChange={(e) => setNewMemberNumber(e.target.value)}
-                      />
+                      <Field label="Number">
+                        <input
+                          className="peer w-full rounded-md border bg-background px-2 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+                          placeholder=" "
+                          value={newMemberNumber}
+                          onChange={(e) => setNewMemberNumber(e.target.value)}
+                        />
+                      </Field>
                     </td>
                     <td className="px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Name</p>
-                      <input
-                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-                        value={newMemberName}
-                        onChange={(e) => setNewMemberName(e.target.value)}
-                        required
-                      />
+                      <Field label="Name">
+                        <input
+                          className="peer w-full rounded-md border bg-background px-2 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+                          placeholder=" "
+                          value={newMemberName}
+                          onChange={(e) => setNewMemberName(e.target.value)}
+                          required
+                        />
+                      </Field>
                     </td>
                     <td className="px-3 py-2 hidden md:table-cell">
-                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Phone</p>
-                      <input
-                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-                        value={newMemberPhone}
-                        onChange={(e) => setNewMemberPhone(e.target.value)}
-                      />
+                      <Field label="Phone">
+                        <input
+                          className="peer w-full rounded-md border bg-background px-2 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+                          placeholder=" "
+                          value={newMemberPhone}
+                          onChange={(e) => setNewMemberPhone(e.target.value)}
+                        />
+                      </Field>
                     </td>
                     <td className="px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Role</p>
-                      <input
-                        className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-                        value={newMemberRole}
-                        onChange={(e) => setNewMemberRole(e.target.value)}
-                      />
+                      <Field label="Role">
+                        <input
+                          className="peer w-full rounded-md border bg-background px-2 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+                          placeholder=" "
+                          value={newMemberRole}
+                          onChange={(e) => setNewMemberRole(e.target.value)}
+                        />
+                      </Field>
                     </td>
                     <td className="px-3 py-2">
                       <div className="mb-2 grid gap-2">

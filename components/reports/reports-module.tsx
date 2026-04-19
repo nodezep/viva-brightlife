@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import {useTranslations} from 'next-intl';
 import type {LoanRecord, MarejeshoRow} from '@/types';
+import {Field} from '../ui/field';
 
 const reportTypes = [
   'monthly_collection',
@@ -572,61 +573,78 @@ export function ReportsModule({initialRows, marejeshoRows}: Props) {
       </div>
 
       <div className="no-print grid gap-3 rounded-2xl border bg-card/80 p-4 backdrop-blur report-fade-up md:grid-cols-5">
-        <div className="flex items-center gap-2 rounded-xl border bg-white/80 px-3 py-2 text-xs text-slate-600 shadow-sm">
-          <CalendarRange size={14} />
-          <span className="font-semibold text-slate-800">Date Range</span>
+        <Field label={startDate ? "Start Date" : "Start Date"}>
+          <input
+            type="date"
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            placeholder=" "
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </Field>
+        <Field label="End Date">
+          <input
+            type="date"
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            placeholder=" "
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </Field>
+        <div className="relative">
+          <select
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            value={loanType}
+            onChange={(e) => setLoanType(e.target.value)}
+          >
+            <option value="all">All Types</option>
+            <option value="binafsi">binafsi</option>
+            <option value="biashara">biashara</option>
+            <option value="watumishi">watumishi</option>
+            <option value="electronics">electronics</option>
+            <option value="kilimo">kilimo</option>
+            <option value="bima">bima</option>
+            <option value="vikundi_wakinamama">vikundi_wakinamama</option>
+            <option value="vyombo_moto">vyombo_moto</option>
+          </select>
+          <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+            Loan Type
+          </label>
         </div>
-        <input
-          type="date"
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-        <input
-          type="date"
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-        />
-        <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={loanType}
-          onChange={(e) => setLoanType(e.target.value)}
-        >
-          <option value="all">All Types</option>
-          <option value="binafsi">binafsi</option>
-          <option value="biashara">biashara</option>
-          <option value="watumishi">watumishi</option>
-          <option value="electronics">electronics</option>
-          <option value="kilimo">kilimo</option>
-          <option value="bima">bima</option>
-          <option value="vikundi_wakinamama">vikundi_wakinamama</option>
-          <option value="vyombo_moto">vyombo_moto</option>
-        </select>
-        <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="closed">Closed</option>
-          <option value="defaulted">Defaulted</option>
-          <option value="pending">Pending</option>
-        </select>
-        <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm md:col-span-5"
-          value={reportType}
-          onChange={(e) =>
-            setReportType(e.target.value as (typeof reportTypes)[number])
-          }
-        >
-          {reportTypes.map((type) => (
-            <option key={type} value={type}>
-              {t(`reports.${type}`)}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+            <option value="defaulted">Defaulted</option>
+            <option value="pending">Pending</option>
+          </select>
+          <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+            Status
+          </label>
+        </div>
+        <div className="relative md:col-span-5">
+          <select
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            value={reportType}
+            onChange={(e) =>
+              setReportType(e.target.value as (typeof reportTypes)[number])
+            }
+          >
+            {reportTypes.map((type) => (
+              <option key={type} value={type}>
+                {t(`reports.${type}`)}
+              </option>
+            ))}
+          </select>
+          <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+            Select Report Type
+          </label>
+        </div>
       </div>
 
       <div className="grid gap-4 report-stagger md:grid-cols-4">

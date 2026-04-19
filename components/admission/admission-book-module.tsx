@@ -3,6 +3,7 @@
 import {useEffect, useMemo, useState, useTransition} from 'react';
 import type {AdmissionBookRow, AdmissionGroup} from '@/types';
 import {createClient} from '@/lib/supabase/client';
+import {Field} from '../ui/field';
 
 type Props = {
   initialRows: AdmissionBookRow[];
@@ -178,24 +179,31 @@ export function AdmissionBookModule({initialRows, groups}: Props) {
       </div>
 
       <div className={`grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-3 ${isPending ? 'opacity-60' : ''}`}>
-        <input
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          placeholder="Search by name, number, or group"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={groupFilter}
-          onChange={(e) => setGroupFilter(e.target.value)}
-        >
-          <option value="">Select group</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.id}>
-              {group.name} ({group.number})
-            </option>
-          ))}
-        </select>
+        <Field label="Search">
+          <input
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            placeholder=" "
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </Field>
+        <div className="relative">
+          <select
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            value={groupFilter}
+            onChange={(e) => setGroupFilter(e.target.value)}
+          >
+            <option value="">Select group</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name} ({group.number})
+              </option>
+            ))}
+          </select>
+          <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+            Filter by Group
+          </label>
+        </div>
       </div>
 
       {error ? (

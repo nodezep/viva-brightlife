@@ -52,6 +52,7 @@ function pickSingleRelation<T>(value: T | T[] | null | undefined): T | null {
 type OverdueMetrics = {
   daysOverdue: number;
   overdueAmount: number;
+  totalPaid: number;
 };
 
 function getTodayIsoLocal(): string {
@@ -126,9 +127,10 @@ async function getOverdueMetricsForLoans(
     );
     const overdueDays = Math.max(0, Math.floor((todayUtc - expectedUtc) / 86400000));
 
-    const current = metrics.get(row.loan_id) ?? {daysOverdue: 0, overdueAmount: 0};
+    const current = metrics.get(row.loan_id) ?? {daysOverdue: 0, overdueAmount: 0, totalPaid: 0};
     current.overdueAmount += Math.max(expectedAmount - paidAmount, 0);
     current.daysOverdue = Math.max(current.daysOverdue, overdueDays);
+    current.totalPaid += paidAmount;
     metrics.set(row.loan_id, current);
   });
 
@@ -270,6 +272,16 @@ export async function getLoansByType(
   }
 
   const records = (data as unknown as LoanRow[]).map(toLoanRecord);
+
+  // Trigger auto-extensions for binafsi loans in parallel
+  if (loanType === 'binafsi') {
+    await Promise.all(
+      records
+        .filter((r) => r.status === 'active')
+        .map((r) => checkAndExtendLoanIfOverdue(r.id).catch(() => null))
+    );
+  }
+
   const overdueMetrics = await getOverdueMetricsForLoans(
     supabase,
     records.map((record) => record.id)
@@ -291,10 +303,12 @@ export async function getLoansByType(
         }
         const todayStr = getTodayIsoLocal();
         const daysOverdue = Math.max(0, diffDays(todayStr, returnDate));
+        const metrics = overdueMetrics.get(record.id);
         return {
           ...record,
           daysOverdue,
-          overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0
+          overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0,
+          amountPaid: metrics?.totalPaid ?? record.amountPaid
         };
       }
       const metrics = overdueMetrics.get(record.id);
@@ -304,7 +318,8 @@ export async function getLoansByType(
       return {
         ...record,
         daysOverdue: metrics.daysOverdue,
-        overdueAmount: metrics.overdueAmount
+        overdueAmount: metrics.overdueAmount,
+        amountPaid: metrics.totalPaid
       };
     }),
     count: count ?? 0
@@ -501,7 +516,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
 
   let loanTypeQuery = supabase
     .from('loans')
-    .select('loan_type,status,principal_amount,outstanding_balance,disbursement_date');
+    .select('loan_type,status,principal_amount,outstanding_balance,amount_withdrawn,disbursement_date');
 
   if (range !== 'all' && startDate && endDate) {
     activeLoansQuery = activeLoansQuery
@@ -549,15 +564,17 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     0
   );
 
+  const totalCollections = (loanTypeRows ?? []).reduce(
+    (sum, row) => sum + Number(row.amount_withdrawn ?? 0),
+    0
+  );
+  
   const totalScheduleRows = (scheduleAllLoans ?? []).flatMap(
     (row) =>
       (row as {loan_schedules?: Array<{expected_amount?: number; paid_amount?: number}>})
         .loan_schedules ?? []
   );
-  const totalCollections = totalScheduleRows.reduce(
-    (sum, row) => sum + Number(row.paid_amount ?? 0),
-    0
-  );
+
   const totalDue = totalScheduleRows.reduce(
     (sum, row) => sum + Number(row.expected_amount ?? 0),
     0
@@ -616,6 +633,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
       }
       acc[type].disbursedAmount += Number(row.principal_amount ?? 0);
       acc[type].outstandingBalance += Number(row.outstanding_balance ?? 0);
+      acc[type].collectedAmount += Number(row.amount_withdrawn ?? 0);
       return acc;
     },
     {} as Record<

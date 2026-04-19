@@ -12,11 +12,11 @@ type Props = {
 };
 
 const Field = ({label, children}: {label: string; children: ReactNode}) => (
-  <div className="space-y-1">
-    <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 ml-1">
-      {label}
-    </p>
+  <div className="relative">
     {children}
+    <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-sm peer-placeholder-shown:font-normal peer-placeholder-shown:text-muted-foreground peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+      {label}
+    </label>
   </div>
 );
 
@@ -152,8 +152,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           <Field label="S/NO">
             <input
               required
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              placeholder="S/NO"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="memberNumber"
               value={memberSerial}
               onChange={(e) => setMemberSerial(e.target.value)}
@@ -162,7 +162,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           <Field label="Jina">
             <input
               required
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="memberName"
               defaultValue={loan.memberName}
             />
@@ -172,7 +173,8 @@ export function LoanEditForm({loan, onClose}: Props) {
               required
               type="text"
               inputMode="numeric"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               value={principalDisplay}
               onChange={(e) => {
                 const raw = stripNumber(e.target.value);
@@ -186,7 +188,8 @@ export function LoanEditForm({loan, onClose}: Props) {
             <input
               required
               type="date"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="disbursementDate"
               value={disbursementDate}
               onChange={(e) => setDisbursementDate(e.target.value)}
@@ -196,7 +199,8 @@ export function LoanEditForm({loan, onClose}: Props) {
             <input
               required
               type="date"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="returnStartDate"
               value={returnStartDate}
               onChange={(e) => setReturnStartDate(e.target.value)}
@@ -205,7 +209,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           <Field label="Idadi ya Siku za Malimbikizo">
             <input
               type="number"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="daysOverdue"
               value={daysOverdue}
               onChange={(e) => setDaysOverdue(e.target.value)}
@@ -217,7 +222,8 @@ export function LoanEditForm({loan, onClose}: Props) {
               required
               type="text"
               inputMode="decimal"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="interestRate"
               value={interestRate}
               onChange={(e) => setInterestRate(e.target.value)}
@@ -228,7 +234,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           <Field label="Muda wa Mkopo (Mwezi)">
             <input
               type="number"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="durationMonths"
               value={durationMonths}
               onChange={(e) => setDurationMonths(e.target.value)}
@@ -239,7 +246,8 @@ export function LoanEditForm({loan, onClose}: Props) {
             <input
               type="text"
               inputMode="numeric"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               value={amountPaidDisplay}
               onChange={(e) => {
                 const raw = stripNumber(e.target.value);
@@ -253,7 +261,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           <Field label="Namba ya Simu">
             <input
               type="tel"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
               name="memberPhone"
               value={memberPhone}
               onChange={(e) => setMemberPhone(e.target.value)}
@@ -269,7 +278,8 @@ export function LoanEditForm({loan, onClose}: Props) {
       <Field label={t('table.member_number') || 'Member Number'}>
         <input
           required
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           name="memberNumber"
           defaultValue={loan.memberNumber}
         />
@@ -277,7 +287,8 @@ export function LoanEditForm({loan, onClose}: Props) {
       <Field label={t('table.member_name') || 'Member Name'}>
         <input
           required
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           name="memberName"
           defaultValue={loan.memberName}
         />
@@ -285,7 +296,8 @@ export function LoanEditForm({loan, onClose}: Props) {
       {loan.loanType === 'electronics' ? (
         <Field label="Product Name">
           <input
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            placeholder=" "
             name="itemDescription"
             value={itemDescription}
             onChange={(e) => setItemDescription(e.target.value)}
@@ -295,7 +307,8 @@ export function LoanEditForm({loan, onClose}: Props) {
       <Field label={t('table.loan_number') || 'Loan Number'}>
         <input
           required
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           name="loanNumber"
           defaultValue={loan.loanNumber}
         />
@@ -305,7 +318,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           required
           type="text"
           inputMode="numeric"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={disbursementAmountDisplay}
           onChange={(e) => {
             const raw = stripNumber(e.target.value);
@@ -319,7 +333,8 @@ export function LoanEditForm({loan, onClose}: Props) {
         <input
           required
           type="date"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           name="disbursementDate"
           defaultValue={loan.disbursementDate}
         />
@@ -328,7 +343,8 @@ export function LoanEditForm({loan, onClose}: Props) {
         <input
           required
           type="date"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           name="returnStartDate"
           value={returnStartDate}
           onChange={(e) => setReturnStartDate(e.target.value)}
@@ -338,7 +354,8 @@ export function LoanEditForm({loan, onClose}: Props) {
         <input
           type="text"
           inputMode="numeric"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={securityAmountDisplay}
           onChange={(e) => {
             const raw = stripNumber(e.target.value);
@@ -352,7 +369,8 @@ export function LoanEditForm({loan, onClose}: Props) {
         <input
           required
           type="number"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           name="cycle"
           defaultValue={loan.cycle}
         />
@@ -362,7 +380,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           required
           type="text"
           inputMode="numeric"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={totalRepayDisplay}
           onChange={(e) => {
             const raw = stripNumber(e.target.value);
@@ -397,7 +416,8 @@ export function LoanEditForm({loan, onClose}: Props) {
           required
           type="text"
           inputMode="numeric"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={installmentDisplay}
           onChange={(e) => {
             const raw = stripNumber(e.target.value);
@@ -411,7 +431,8 @@ export function LoanEditForm({loan, onClose}: Props) {
         <input
           type="text"
           inputMode="numeric"
-          className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
           value={overdueAmountDisplay}
           onChange={(e) => {
             const raw = stripNumber(e.target.value);

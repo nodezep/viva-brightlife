@@ -1,10 +1,19 @@
 'use client';
 
-import {useTransition, useState, useEffect} from 'react';
+import {useTransition, useState, useEffect, type ReactNode} from 'react';
 import {useTranslations} from 'next-intl';
 import {createLoanAction} from '@/lib/actions/loan';
 import type {LoanType} from '@/types';
 import {useRouter} from '@/lib/navigation';
+
+const Field = ({label, children}: {label: string; children: ReactNode}) => (
+  <div className="relative">
+    {children}
+    <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-placeholder-shown:top-2.5 peer-placeholder-shown:text-sm peer-placeholder-shown:font-normal peer-placeholder-shown:text-muted-foreground peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+      {label}
+    </label>
+  </div>
+);
 
 type Props = {
   loanType: LoanType;
@@ -45,6 +54,7 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
   const [overdueAmountDisplay, setOverdueAmountDisplay] = useState('');
   const [installmentDisplay, setInstallmentDisplay] = useState('');
   const [totalRepayDisplay, setTotalRepayDisplay] = useState('');
+  const [returnStartDate, setReturnStartDate] = useState('');
 
   useEffect(() => {
     setInstallmentDisplay(formatNumber(installment));
@@ -80,94 +90,123 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
     >
       {isIndividual ? (
         <>
-          <input
-            required
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="S/NO"
-            name="memberNumber"
-            value={memberSerial}
-            onChange={(e) => setMemberSerial(e.target.value)}
-          />
-          <input
-            required
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Jina"
-            name="memberName"
-          />
-          <input
-            required
-            type="text"
-            inputMode="numeric"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Kiasi cha Mkopo"
-            value={principalDisplay}
-            onChange={(e) => {
-              const raw = stripNumber(e.target.value);
-              setPrincipal(raw);
-              setPrincipalDisplay(formatNumber(raw));
-            }}
-          />
+          <Field label="S/NO">
+            <input
+              required
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="memberNumber"
+              value={memberSerial}
+              onChange={(e) => setMemberSerial(e.target.value)}
+            />
+          </Field>
+          <Field label="Jina">
+            <input
+              required
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="memberName"
+            />
+          </Field>
+          <Field label="Kiasi cha Mkopo">
+            <input
+              required
+              type="text"
+              inputMode="numeric"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              value={principalDisplay}
+              onChange={(e) => {
+                const raw = stripNumber(e.target.value);
+                setPrincipal(raw);
+                setPrincipalDisplay(formatNumber(raw));
+              }}
+            />
+          </Field>
           <input type="hidden" name="disbursementAmount" value={principal} />
-          <input
-            required
-            type="date"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            name="disbursementDate"
-            value={disbursementDate}
-            onChange={(e) => setDisbursementDate(e.target.value)}
-          />
-          <input
-            type="number"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Idadi ya Siku za Malimbikizo"
-            name="daysOverdue"
-            value={daysOverdue}
-            onChange={(e) => setDaysOverdue(e.target.value)}
-            min={0}
-          />
-          <input
-            required
-            type="text"
-            inputMode="decimal"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Asilimia ya Riba"
-            name="interestRate"
-            value={interestRate}
-            onChange={(e) => setInterestRate(e.target.value)}
-            min={0}
-            step="0.01"
-          />
-          <input
-            type="number"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Muda wa Mkopo (Mwezi)"
-            name="durationMonths"
-            value={durationMonths}
-            onChange={(e) => setDurationMonths(e.target.value)}
-            min={1}
-          />
-          <input
-            type="text"
-            inputMode="numeric"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Malipo ya Mkopo"
-            value={amountPaidDisplay}
-            onChange={(e) => {
-              const raw = stripNumber(e.target.value);
-              setAmountPaid(raw);
-              setAmountPaidDisplay(formatNumber(raw));
-            }}
-            min={0}
-          />
+          <Field label="Disbursement Date">
+            <input
+              required
+              type="date"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="disbursementDate"
+              value={disbursementDate}
+              onChange={(e) => setDisbursementDate(e.target.value)}
+            />
+          </Field>
+          <Field label="Return Start Date (optional)">
+            <input
+              type="date"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="returnStartDate"
+              value={returnStartDate}
+              onChange={(e) => setReturnStartDate(e.target.value)}
+            />
+          </Field>
+          <Field label="Idadi ya Siku za Malimbikizo">
+            <input
+              type="number"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="daysOverdue"
+              value={daysOverdue}
+              onChange={(e) => setDaysOverdue(e.target.value)}
+              min={0}
+            />
+          </Field>
+          <Field label="Asilimia ya Riba">
+            <input
+              required
+              type="text"
+              inputMode="decimal"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="interestRate"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              min={0}
+              step="0.01"
+            />
+          </Field>
+          <Field label="Muda wa Mkopo (Mwezi)">
+            <input
+              type="number"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="durationMonths"
+              value={durationMonths}
+              onChange={(e) => setDurationMonths(e.target.value)}
+              min={1}
+            />
+          </Field>
+          <Field label="Malipo ya Mkopo">
+            <input
+              type="text"
+              inputMode="numeric"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              value={amountPaidDisplay}
+              onChange={(e) => {
+                const raw = stripNumber(e.target.value);
+                setAmountPaid(raw);
+                setAmountPaidDisplay(formatNumber(raw));
+              }}
+              min={0}
+            />
+          </Field>
           <input type="hidden" name="amountPaid" value={amountPaid} />
-          <input
-            type="tel"
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Namba ya Simu"
-            name="memberPhone"
-            value={memberPhone}
-            onChange={(e) => setMemberPhone(e.target.value)}
-          />
+          <Field label="Namba ya Simu">
+            <input
+              type="tel"
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="memberPhone"
+              value={memberPhone}
+              onChange={(e) => setMemberPhone(e.target.value)}
+            />
+          </Field>
 
           <input type="hidden" name="cycle" value={durationMonthsValue || 1} />
           <input type="hidden" name="durationWeeks" value={0} />
@@ -176,158 +215,204 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
         </>
       ) : (
         <>
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.member_number') || 'Member Number'}
-        name="memberNumber"
-      />
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.member_name') || 'Member Name'}
-        name="memberName"
-      />
-      <input
-        required
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.loan_number') || 'Loan Number'}
-        name="loanNumber"
-      />
-      <input
-        required
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.disbursement_amount') || 'Disbursement Amount'}
-        value={disbursementAmountDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setDisbursementAmount(raw);
-          setDisbursementAmountDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.member_number') || 'Member Number'}>
+        <input
+          required
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          name="memberNumber"
+        />
+      </Field>
+      <Field label={t('table.member_name') || 'Member Name'}>
+        <input
+          required
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          name="memberName"
+        />
+      </Field>
+      <Field label={t('table.loan_number') || 'Loan Number'}>
+        <input
+          required
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          name="loanNumber"
+        />
+      </Field>
+      <Field label={t('table.disbursement_amount') || 'Disbursement Amount'}>
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          value={disbursementAmountDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setDisbursementAmount(raw);
+            setDisbursementAmountDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="disbursementAmount" value={disbursementAmount} />
-      <input
-        required
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        name="disbursementDate"
-      />
-      <input
-        type="date"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        name="returnStartDate"
-        placeholder="Return Start Date (optional)"
-      />
-      <input
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.security_amount') || 'Security Amount'}
-        value={securityAmountDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setSecurityAmount(raw);
-          setSecurityAmountDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label="Disbursement Date">
+        <input
+          required
+          type="date"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          name="disbursementDate"
+        />
+      </Field>
+      <Field label="Return Start Date (optional)">
+        <input
+          type="date"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          name="returnStartDate"
+          value={returnStartDate}
+          onChange={(e) => setReturnStartDate(e.target.value)}
+        />
+      </Field>
+      <Field label={t('table.security_amount') || 'Security Amount'}>
+        <input
+          type="text"
+          inputMode="numeric"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          value={securityAmountDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setSecurityAmount(raw);
+            setSecurityAmountDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="securityAmount" value={securityAmount} />
-      <input
-        required
-        type="number"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.cycle') || 'Cycle'}
-        name="cycle"
-        defaultValue={1}
-      />
+      <Field label={t('table.cycle') || 'Cycle'}>
+        <input
+          required
+          type="number"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          name="cycle"
+          defaultValue={1}
+        />
+      </Field>
 
-      <input
-        required
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder="Total Expected Repayment (OS Balance)"
-        value={totalRepayDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setTotalRepay(raw);
-          setTotalRepayDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label="Total Expected Repayment (OS Balance)">
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          value={totalRepayDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setTotalRepay(raw);
+            setTotalRepayDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="outstandingBalance" value={totalRepay} />
       {loanType !== 'vikundi_wakinamama' ? (
-        <select
-          className="rounded-lg border bg-background px-3 py-2 text-sm"
-          value={repaymentFrequency}
-          onChange={(e) =>
-            setRepaymentFrequency(e.target.value as 'weekly' | 'daily' | 'monthly')
-          }
-          name="repaymentFrequency"
-        >
-          <option value="weekly">Weekly</option>
-          <option value="daily">Daily</option>
-          <option value="monthly">Monthly</option>
-        </select>
+        <div className="relative">
+          <select
+            className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+            value={repaymentFrequency}
+            onChange={(e) =>
+              setRepaymentFrequency(e.target.value as 'weekly' | 'daily' | 'monthly')
+            }
+            name="repaymentFrequency"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+            Repayment Frequency
+          </label>
+        </div>
       ) : (
         <input type="hidden" name="repaymentFrequency" value="weekly" />
       )}
-      <input
-        required
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.installment_size') || 'Installment Size'}
-        value={installmentDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setInstallment(raw);
-          setInstallmentDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.installment_size') || 'Installment Size'}>
+        <input
+          required
+          type="text"
+          inputMode="numeric"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          value={installmentDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setInstallment(raw);
+            setInstallmentDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="installmentSize" value={installment} />
 
-      <input
-        type="text"
-        inputMode="numeric"
-        className="rounded-lg border bg-background px-3 py-2 text-sm"
-        placeholder={t('table.overdue_od') || 'Overdue OD'}
-        value={overdueAmountDisplay}
-        onChange={(e) => {
-          const raw = stripNumber(e.target.value);
-          setOverdueAmount(raw);
-          setOverdueAmountDisplay(formatNumber(raw));
-        }}
-      />
+      <Field label={t('table.overdue_od') || 'Overdue OD'}>
+        <input
+          type="text"
+          inputMode="numeric"
+          className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+          placeholder=" "
+          value={overdueAmountDisplay}
+          onChange={(e) => {
+            const raw = stripNumber(e.target.value);
+            setOverdueAmount(raw);
+            setOverdueAmountDisplay(formatNumber(raw));
+          }}
+        />
+      </Field>
       <input type="hidden" name="overdueAmount" value={overdueAmount} />
         </>
       )}
 
       {loanType === 'electronics' ? (
         <>
-          <input
-            required
-            className="rounded-lg border bg-background px-3 py-2 text-sm"
-            placeholder="Product Name (e.g. 43 inch TV)"
-            name="itemDescription"
-          />
+          <Field label="Product Name (e.g. 43 inch TV)">
+            <input
+              required
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              placeholder=" "
+              name="itemDescription"
+            />
+          </Field>
         </>
       ) : null}
       
       {loanType === 'kilimo' ? (
         <>
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Crop Type" name="cropType" />
-          <input type="number" className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Farm Size (Acres)" name="farmSizeAcres" />
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Season" name="season" />
+          <Field label="Crop Type">
+            <input className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="cropType" />
+          </Field>
+          <Field label="Farm Size (Acres)">
+            <input type="number" className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="farmSizeAcres" />
+          </Field>
+          <Field label="Season">
+            <input className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="season" />
+          </Field>
         </>
       ) : null}
       
       {loanType === 'vyombo_moto' ? (
         <>
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Vehicle Type" name="vehicleType" />
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Make / Model" name="brandModel" />
-          <input className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Registration Number" name="registrationNumber" />
-          <input type="number" className="rounded-lg border bg-background px-3 py-2 text-sm" placeholder="Year of Manufacture" name="yearOfManufacture" />
+          <Field label="Vehicle Type">
+            <input className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="vehicleType" />
+          </Field>
+          <Field label="Make / Model">
+            <input className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="brandModel" />
+          </Field>
+          <Field label="Registration Number">
+            <input className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="registrationNumber" />
+          </Field>
+          <Field label="Year of Manufacture">
+            <input type="number" className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10" placeholder=" " name="yearOfManufacture" />
+          </Field>
         </>
       ) : null}
 
