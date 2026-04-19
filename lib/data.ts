@@ -303,12 +303,10 @@ export async function getLoansByType(
         }
         const todayStr = getTodayIsoLocal();
         const daysOverdue = Math.max(0, diffDays(todayStr, returnDate));
-        const metrics = overdueMetrics.get(record.id);
         return {
           ...record,
           daysOverdue,
-          overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0,
-          amountPaid: metrics?.totalPaid ?? record.amountPaid
+          overdueAmount: daysOverdue > 0 ? record.overdueAmount : 0
         };
       }
       const metrics = overdueMetrics.get(record.id);
@@ -318,8 +316,7 @@ export async function getLoansByType(
       return {
         ...record,
         daysOverdue: metrics.daysOverdue,
-        overdueAmount: metrics.overdueAmount,
-        amountPaid: metrics.totalPaid
+        overdueAmount: metrics.overdueAmount
       };
     }),
     count: count ?? 0
@@ -519,9 +516,6 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     .select('loan_type,status,principal_amount,outstanding_balance,amount_withdrawn,disbursement_date');
 
   if (range !== 'all' && startDate && endDate) {
-    activeLoansQuery = activeLoansQuery
-      .gte('disbursement_date', startDate)
-      .lte('disbursement_date', endDate);
     disbursedQuery = disbursedQuery
       .gte('disbursement_date', startDate)
       .lte('disbursement_date', endDate);
@@ -543,7 +537,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     {count: activeLoans},
     {data: disbursedRows},
     {data: scheduleRangeRows},
-    {data: scheduleAllLoans},
+    {data: allOutstandingRows},
     {count: members},
     {count: groups},
     {data: loanTypeRows}
@@ -551,9 +545,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     activeLoansQuery,
     disbursedQuery,
     scheduleRangeQuery,
-    supabase
-      .from('loans')
-      .select('loan_schedules(expected_amount,paid_amount)'),
+    supabase.from('loans').select('outstanding_balance, amount_withdrawn'),
     supabase.from('members').select('*', {count: 'exact', head: true}),
     supabase.from('groups').select('*', {count: 'exact', head: true}),
     loanTypeQuery
@@ -564,19 +556,13 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     0
   );
 
-  const totalCollections = (loanTypeRows ?? []).reduce(
-    (sum, row) => sum + Number(row.amount_withdrawn ?? 0),
+  const totalCollections = (allOutstandingRows ?? []).reduce(
+    (sum, row) => sum + Math.max(0, Number(row.amount_withdrawn ?? 0)),
     0
   );
-  
-  const totalScheduleRows = (scheduleAllLoans ?? []).flatMap(
-    (row) =>
-      (row as {loan_schedules?: Array<{expected_amount?: number; paid_amount?: number}>})
-        .loan_schedules ?? []
-  );
 
-  const totalDue = totalScheduleRows.reduce(
-    (sum, row) => sum + Number(row.expected_amount ?? 0),
+  const totalDue = (scheduleRangeRows ?? []).reduce(
+    (sum, row) => sum + Math.max(0, Number(row.expected_amount ?? 0)),
     0
   );
 
@@ -667,7 +653,7 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
     loanTypeMetrics[loanType].collectedAmount = totals.collectedAmount;
   });
 
-  const totalOutstanding = (loanTypeRows ?? []).reduce(
+  const totalOutstanding = (allOutstandingRows ?? []).reduce(
     (sum, row) => sum + Number(row.outstanding_balance ?? 0),
     0
   );

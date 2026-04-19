@@ -275,11 +275,15 @@ export async function createLoanAction(formData: FormData) {
         continue;
       }
 
+      const monthlyInterest = (principalAmount * (interestRate / 100));
+      const isLastMonth = month === durationMonths;
+      const expectedAmount = isLastMonth ? (principalAmount + monthlyInterest) : monthlyInterest;
+
       schedules.push({
         loan_id: loanId,
-        week_number: month, // Using month number as the entry identifier
+        week_number: month,
         expected_date: expectedDate,
-        expected_amount: monthlyInstallment,
+        expected_amount: expectedAmount,
         status: 'pending'
       });
     }
@@ -524,11 +528,15 @@ export async function updateLoanAction(formData: FormData) {
         continue;
       }
 
+      const monthlyInterest = (principalAmount * (interestRatePercent / 100));
+      const isLastMonth = month === durationMonths;
+      const expectedAmount = isLastMonth ? (principalAmount + monthlyInterest) : monthlyInterest;
+
       schedules.push({
         loan_id: loanId,
-        week_number: month, // Using month number as the entry identifier
+        week_number: month,
         expected_date: expectedDate,
-        expected_amount: monthlyInstallment,
+        expected_amount: expectedAmount,
         status: 'pending'
       });
     }

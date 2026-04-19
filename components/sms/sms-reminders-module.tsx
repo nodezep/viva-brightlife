@@ -393,7 +393,7 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
           <MessageSquareText className="h-6 w-6 text-primary" /> SMS Reminders
         </h1>
         <p className="text-sm text-muted-foreground">
-          Send automatic payment reminders to clients. Follow the steps below to review and send messages safely.
+          Send automatic payment reminders to clients. Reminders are queued automatically 3 days before the payment date.
         </p>
       </div>
 
@@ -445,8 +445,8 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
               <Lightbulb className="h-4 w-4" /> How it works
             </p>
             <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
-              Complete Steps 1–4 in order. Every message is shown to you for review before anything is sent.
-              Nothing goes to clients without your approval.
+              Payments are monitored automatically. 3 days before each payment date, a reminder is queued to go out.
+              Overdue loans are also tracked daily.
             </p>
           </div>
 
@@ -468,8 +468,8 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
                     className="flex items-center gap-2 px-5 py-2.5 text-sm"
                   >
                     {busy === 'queue' 
-                      ? <><Loader2 className="h-4 w-4 animate-spin" /> Scanning loans…</> 
-                      : <><Search className="h-4 w-4" /> Scan & Prepare Reminders</>}
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing…</> 
+                      : <><Search className="h-4 w-4" /> Manual Sync & Queue Updates</>}
                   </button>
                 </div>
               </div>

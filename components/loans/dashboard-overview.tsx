@@ -124,9 +124,9 @@ export function DashboardOverview({metrics, range, month, week}: Props) {
           icon: Users
         },
         {
-          label: t('schedule_coverage'),
+          label: t('total_collections'),
           value: currency.format(metrics.totalCollections),
-          subtext: `Expected ${currency.format(metrics.totalDue)}`,
+          subtext: `Portfolio sum`,
           icon: Coins
         }
       ];

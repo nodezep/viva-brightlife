@@ -249,7 +249,7 @@ export async function queueOverdueReminders() {
           message,
           days_overdue: daysOverdue,
           scheduled_for: scheduled.toISOString(),
-          status: 'pending_approval',
+          status: 'queued',
           delivery_status: 'queued',
           provider_name: process.env.SMS_PROVIDER ?? 'mock'
         },
@@ -456,7 +456,7 @@ export async function queueUpcomingReminders() {
         message,
         days_overdue: 0,
         scheduled_for: scheduled.toISOString(),
-        status: 'pending_approval',
+        status: 'queued',
         delivery_status: 'queued',
         provider_name: process.env.SMS_PROVIDER ?? 'mock'
       },
