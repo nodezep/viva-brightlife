@@ -189,7 +189,13 @@ export async function updateScheduleStatusAction(
       throw new Error('Schedule not found');
     }
 
-    const loanRow = existing.loans as any;
+    const rawLoans = existing.loans as any;
+    const loanRow = Array.isArray(rawLoans) ? rawLoans[0] : rawLoans;
+    
+    if (!loanRow) {
+      throw new Error('Associated loan not found');
+    }
+
     const currentPaidScroll = Number(existing.paid_amount ?? 0);
     
     // If paymentAmount is provided, we use it. Otherwise assume full expected amount.
@@ -244,6 +250,24 @@ export async function updateScheduleStatusAction(
         .from('loans')
         .update(updatePayload)
         .eq('id', existing.loan_id);
+
+      if (loanRow.loan_type === 'binafsi') {
+        const { data: futureSchedules } = await supabase
+          .from('loan_schedules')
+          .select('id, expected_amount')
+          .eq('loan_id', existing.loan_id)
+          .gt('week_number', existing.week_number);
+
+        if (futureSchedules && futureSchedules.length > 0) {
+          for (const sched of futureSchedules) {
+            const newExpected = Math.max(0, Number(sched.expected_amount) - delta);
+            await supabase
+              .from('loan_schedules')
+              .update({ expected_amount: newExpected })
+              .eq('id', sched.id);
+          }
+        }
+      }
     }
 
     revalidatePath('/', 'layout');
@@ -370,7 +394,7 @@ export async function markGroupSchedulesPaidAction(
   const {data: schedules, error} = await supabase
     .from('loan_schedules')
     .select(
-      'id,loan_id,week_number,expected_amount,paid_amount,status,loans!inner(id,group_id,outstanding_balance,status)'
+      'id,loan_id,week_number,expected_amount,paid_amount,status,loans!inner(id,group_id,outstanding_balance,status,amount_withdrawn)'
     )
     .eq('expected_date', expectedDate)
     .eq('loans.group_id', groupId);
@@ -396,8 +420,8 @@ export async function markGroupSchedulesPaidAction(
     paid_amount: number | null;
     status: string;
     loans:
-      | {id: string; group_id: string; outstanding_balance: number; status: string}
-      | {id: string; group_id: string; outstanding_balance: number; status: string}[]
+      | {id: string; group_id: string; outstanding_balance: number; status: string; amount_withdrawn?: number}
+      | {id: string; group_id: string; outstanding_balance: number; status: string; amount_withdrawn?: number}[]
       | null;
   }>) {
     const loanRow = pickSingle(row.loans);
@@ -447,9 +471,16 @@ export async function markGroupSchedulesPaidAction(
     if (delta !== 0) {
       const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
       const newOutstanding = currentOutstanding - delta;
+      
+      const currentTotalPaid = Number(loanRow.amount_withdrawn ?? 0);
+      const newTotalPaid = currentTotalPaid + delta;
+
       const {error: updateLoanError} = await supabase
         .from('loans')
-        .update({outstanding_balance: newOutstanding})
+        .update({
+          outstanding_balance: newOutstanding,
+          amount_withdrawn: newTotalPaid
+        })
         .eq('id', row.loan_id);
 
       if (updateLoanError) {

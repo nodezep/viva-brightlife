@@ -47,6 +47,7 @@ export async function checkAndExtendLoanIfOverdue(loanId: string) {
     const rate = Number(loan.interest_rate || 0);
     const monthlyInterest = (principal * rate) / 100;
     
+    let currentBalance = Number(loan.outstanding_balance || 0);
     let cursorDate = latestDate;
     while (cursorDate < today) {
       addedMonths++;
@@ -54,31 +55,20 @@ export async function checkAndExtendLoanIfOverdue(loanId: string) {
       if (!nextDate) break;
       cursorDate = nextDate;
       
-      // We will decide the amount later (the very last one gets principal)
+      currentBalance += monthlyInterest;
+
       newSchedules.push({
         loan_id: loanId,
         week_number: schedules.length + addedMonths,
         expected_date: nextDate,
-        expected_amount: monthlyInterest,
+        expected_amount: currentBalance,
         status: 'pending'
       });
     }
 
     if (newSchedules.length > 0) {
-      // 2.a. Prepare the very last schedule to hold the principal
-      newSchedules[newSchedules.length - 1].expected_amount = principal + monthlyInterest;
-
-      // 2.b. IMPORTANT: The PREVIOUSLY last schedule might have had the principal. 
-      // We need to reduce it to interest-only now that we've pushed the principal forward.
-      const lastExistingSched = schedules[schedules.length - 1];
-      if (Number(lastExistingSched.expected_amount) > monthlyInterest + 1) { // +1 for floating point
-         await supabase
-           .from('loan_schedules')
-           .update({ expected_amount: monthlyInterest })
-           .eq('id', lastExistingSched.id);
-      }
-
       const addedInterest = monthlyInterest * addedMonths;
+
       const newSecurity = Number(loan.security_amount || 0) + addedInterest;
       const newBalance = Number(loan.outstanding_balance || 0) + addedInterest;
       const newCycle = Number(loan.cycle_count || 0) + addedMonths;

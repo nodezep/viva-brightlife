@@ -275,9 +275,9 @@ export async function createLoanAction(formData: FormData) {
         continue;
       }
 
-      const monthlyInterest = (principalAmount * (interestRate / 100));
+      const monthlyInterest = (principalAmount * (interestRatePercent / 100));
       const isLastMonth = month === durationMonths;
-      const expectedAmount = isLastMonth ? (principalAmount + monthlyInterest) : monthlyInterest;
+      const expectedAmount = principalAmount + (monthlyInterest * month);
 
       schedules.push({
         loan_id: loanId,
@@ -530,7 +530,7 @@ export async function updateLoanAction(formData: FormData) {
 
       const monthlyInterest = (principalAmount * (interestRatePercent / 100));
       const isLastMonth = month === durationMonths;
-      const expectedAmount = isLastMonth ? (principalAmount + monthlyInterest) : monthlyInterest;
+      const expectedAmount = principalAmount + (monthlyInterest * month);
 
       schedules.push({
         loan_id: loanId,

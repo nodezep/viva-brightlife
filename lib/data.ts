@@ -592,8 +592,8 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
       if (!acc[loanType]) {
         acc[loanType] = {dueAmount: 0, collectedAmount: 0};
       }
-      acc[loanType].dueAmount += Number(row.expected_amount ?? 0);
-      acc[loanType].collectedAmount += Number(row.paid_amount ?? 0);
+      acc[loanType].dueAmount += Math.max(0, Number(row.expected_amount ?? 0));
+      acc[loanType].collectedAmount += Math.max(0, Number(row.paid_amount ?? 0));
       return acc;
     },
     {} as Record<LoanType, {dueAmount: number; collectedAmount: number}>
@@ -617,9 +617,9 @@ export async function getDashboardMetrics(options: DashboardMetricOptions = {}) 
       if (row.status === 'active') {
         acc[type].activeCount += 1;
       }
-      acc[type].disbursedAmount += Number(row.principal_amount ?? 0);
-      acc[type].outstandingBalance += Number(row.outstanding_balance ?? 0);
-      acc[type].collectedAmount += Number(row.amount_withdrawn ?? 0);
+      acc[type].disbursedAmount += Math.max(0, Number(row.principal_amount ?? 0));
+      acc[type].outstandingBalance += Math.max(0, Number(row.outstanding_balance ?? 0));
+      acc[type].collectedAmount += Math.max(0, Number(row.amount_withdrawn ?? 0));
       return acc;
     },
     {} as Record<
