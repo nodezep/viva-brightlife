@@ -100,5 +100,11 @@
     "language": "Language",
     "theme": "Theme",
     "profile": "Profile"
+  },
+  "auth": {
+    "session_timeout_title": "Session Expiring",
+    "session_timeout_description": "You have been inactive for a while. For security reasons, you will be logged out automatically in less than a minute. Would you like to stay logged in?",
+    "stay_logged_in": "Stay Logged In",
+    "logging_out": "Logging out..."
   }
 }

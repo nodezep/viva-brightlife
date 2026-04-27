@@ -177,17 +177,19 @@ export async function createLoanAction(formData: FormData) {
     insertPayload.amount_withdrawn = amountPaid;
     insertPayload.interest_rate = interestRatePercent;
     insertPayload.days_overdue = daysOverdue;
+    insertPayload.repayment_frequency = 'monthly';
   } else {
     insertPayload.repayment_frequency = repaymentFrequency;
-    const defaultReturnStart = getDefaultReturnStartDate(
-      disbursementDate,
-      repaymentFrequency
-    );
-    insertPayload.return_start_date =
-      returnStartDateRaw && returnStartDateRaw.trim()
-        ? returnStartDateRaw
-        : defaultReturnStart;
   }
+
+  const defaultReturnStart = loanType === 'binafsi' 
+    ? addMonthsToDateOnly(disbursementDate, 1)
+    : getDefaultReturnStartDate(disbursementDate, repaymentFrequency);
+
+  insertPayload.return_start_date =
+    returnStartDateRaw && returnStartDateRaw.trim()
+      ? returnStartDateRaw
+      : defaultReturnStart;
 
   const {data, error} = await supabase.from('loans').insert(insertPayload).select('id').single();
 
@@ -275,9 +277,7 @@ export async function createLoanAction(formData: FormData) {
         continue;
       }
 
-      const monthlyInterest = (principalAmount * (interestRatePercent / 100));
-      const isLastMonth = month === durationMonths;
-      const expectedAmount = principalAmount + (monthlyInterest * month);
+      const expectedAmount = monthlyInstallment;
 
       schedules.push({
         loan_id: loanId,
@@ -403,22 +403,24 @@ export async function updateLoanAction(formData: FormData) {
     overdue_amount: overdueAmount
   };
 
-  updatePayload.repayment_frequency = repaymentFrequency;
-  const defaultReturnStart = getDefaultReturnStartDate(
-    disbursementDate,
-    repaymentFrequency
-  );
-  updatePayload.return_start_date =
-    returnStartDateRaw && returnStartDateRaw.trim()
-      ? returnStartDateRaw
-      : defaultReturnStart;
-
   if (loanType === 'binafsi') {
     updatePayload.duration_months = durationMonths;
     updatePayload.amount_withdrawn = amountPaid;
     updatePayload.interest_rate = interestRatePercent;
     updatePayload.days_overdue = daysOverdue;
+    updatePayload.repayment_frequency = 'monthly';
+  } else {
+    updatePayload.repayment_frequency = repaymentFrequency;
   }
+
+  const defaultReturnStart = loanType === 'binafsi'
+    ? addMonthsToDateOnly(disbursementDate, 1)
+    : getDefaultReturnStartDate(disbursementDate, repaymentFrequency);
+
+  updatePayload.return_start_date =
+    returnStartDateRaw && returnStartDateRaw.trim()
+      ? returnStartDateRaw
+      : defaultReturnStart;
   
   if (loanType === 'electronics') {
     updatePayload.item_description = itemDescription.trim() || null;
@@ -528,9 +530,7 @@ export async function updateLoanAction(formData: FormData) {
         continue;
       }
 
-      const monthlyInterest = (principalAmount * (interestRatePercent / 100));
-      const isLastMonth = month === durationMonths;
-      const expectedAmount = principalAmount + (monthlyInterest * month);
+      const expectedAmount = monthlyInstallment;
 
       schedules.push({
         loan_id: loanId,

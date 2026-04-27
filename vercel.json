@@ -1,0 +1,18 @@
+{
+  "crons": [
+    {
+      "path": "/api/jobs/sms/queue",
+      "schedule": "30 7 * * *",
+      "headers": {
+        "x-job-token": "GMicrofinanc.."
+      }
+    },
+    {
+      "path": "/api/jobs/sms/dispatch",
+      "schedule": "*/15 * * * *",
+      "headers": {
+        "x-job-token": "GMicrofinanc.."
+      }
+    }
+  ]
+}

@@ -62,7 +62,7 @@ export async function checkAndExtendLoanIfOverdue(loanId: string) {
         week_number: schedules.length + addedMonths,
         expected_date: nextDate,
         expected_amount: currentBalance,
-        status: 'pending'
+        status: 'overdue'
       });
     }
 

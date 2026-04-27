@@ -2,7 +2,7 @@
 
 import {useState, useEffect, useTransition} from 'react';
 import {X, Check, Edit2, RotateCcw, PlusCircle} from 'lucide-react';
-import {getLoanSchedulesAction, updateScheduleStatusAction} from '@/lib/actions/loan-schedules';
+import {getLoanSchedulesAction, updateScheduleStatusAction, regenerateLoanSchedulesAction} from '@/lib/actions/loan-schedules';
 import {useTranslations} from 'next-intl';
 import {useRouter} from '@/lib/navigation';
 
@@ -89,6 +89,20 @@ export function LoanSchedulesDialog({loanId, loanType, onClose}: Props) {
     setInputAmount(schedule.paid_amount > 0 ? schedule.paid_amount.toString() : schedule.expected_amount.toString());
   };
 
+  const handleRegenerate = () => {
+    if (!window.confirm('Are you sure you want to fix this schedule? This will reset all pending installments to their calculated monthly values. Paid items will be preserved if possible, but it is recommended to do this for unpaid loans.')) return;
+    
+    startTransition(async () => {
+      const result = await regenerateLoanSchedulesAction(loanId);
+      if (result.error) {
+        alert(result.error);
+      } else {
+        void fetchSchedules();
+        router.refresh();
+      }
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-background p-6 shadow-xl">
@@ -97,12 +111,22 @@ export function LoanSchedulesDialog({loanId, loanType, onClose}: Props) {
             <h2 className="text-xl font-bold">Marejesho (Repayments Schedule)</h2>
             <p className="text-sm text-muted-foreground">Manage installment tracking and cumulative payments</p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 hover:bg-muted"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRegenerate}
+              disabled={isPending || loading}
+              className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 transition-colors disabled:opacity-50"
+            >
+              <RotateCcw size={14} className={isPending ? 'animate-spin' : ''} /> 
+              Fix Schedule
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-full p-2 hover:bg-muted"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto rounded-lg border">

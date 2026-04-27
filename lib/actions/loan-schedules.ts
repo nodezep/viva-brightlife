@@ -14,7 +14,9 @@ const getDefaultReturnStartDate = (
   disbursementDate: string,
   repaymentFrequency: string
 ) =>
-  addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
+  repaymentFrequency === 'monthly'
+    ? addMonthsToDateOnly(disbursementDate, 1)
+    : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
 
 const buildWeeklySchedules = (params: {
   loanId: string;
@@ -96,7 +98,7 @@ export async function getLoanSchedulesAction(loanId: string) {
 
   const {data: loanRow, error: loanError} = await supabase
     .from('loans')
-    .select('loan_type, disbursement_date, duration_months, weekly_installment, status')
+    .select('loan_type, disbursement_date, duration_months, weekly_installment, status, return_start_date')
     .eq('id', loanId)
     .single();
 
@@ -121,8 +123,17 @@ export async function getLoanSchedulesAction(loanId: string) {
   const monthlyInstallment = totalRepay / durationMonths;
   const schedules = [];
 
+  const firstReturnDate =
+    loanRow.return_start_date && loanRow.return_start_date.trim()
+      ? loanRow.return_start_date
+      : addMonthsToDateOnly(loanRow.disbursement_date, 1);
+
   for (let month = 1; month <= durationMonths; month++) {
-    const expectedDate = addMonthsToDateOnly(loanRow.disbursement_date, month);
+    const expectedDate =
+      month === 1
+        ? firstReturnDate
+        : addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, month - 1);
+
     if (!expectedDate) {
       continue;
     }
@@ -278,54 +289,89 @@ export async function updateScheduleStatusAction(
 }
 
 export async function regenerateLoanSchedulesAction(loanId: string) {
-  const supabase = createClient();
-  const {data: loanRow, error: loanError} = await supabase
-    .from('loans')
-    .select(
-      'id,loan_type,disbursement_date,repayment_frequency,cycle_count,weekly_installment,outstanding_balance,return_start_date'
-    )
-    .eq('id', loanId)
-    .single();
+  try {
+    const supabase = createClient();
+    const {data: loanRow, error: loanError} = await supabase
+      .from('loans')
+      .select(
+        'id,loan_type,disbursement_date,repayment_frequency,cycle_count,weekly_installment,outstanding_balance,return_start_date,duration_months'
+      )
+      .eq('id', loanId)
+      .single();
 
-  if (loanError || !loanRow) {
-    return {error: loanError?.message || 'Loan not found'};
-  }
-
-  if (loanRow.loan_type === 'binafsi') {
-    return {error: 'Schedule regeneration not supported for binafsi here.'};
-  }
-
-  const durationWeeks = Number(loanRow.cycle_count ?? 0) || 1;
-  const schedules = buildWeeklySchedules({
-    loanId,
-    disbursementDate: loanRow.disbursement_date,
-    returnStartDate: loanRow.return_start_date,
-    repaymentFrequency: loanRow.repayment_frequency ?? 'weekly',
-    durationWeeks,
-    installmentSize: Number(loanRow.weekly_installment ?? 0),
-    outstandingBalance: Number(loanRow.outstanding_balance ?? 0)
-  });
-
-  const {error: deleteError} = await supabase
-    .from('loan_schedules')
-    .delete()
-    .eq('loan_id', loanId);
-
-  if (deleteError) {
-    return {error: deleteError.message};
-  }
-
-  if (schedules.length > 0) {
-    const {error: insertError} = await supabase
-      .from('loan_schedules')
-      .insert(schedules);
-    if (insertError) {
-      return {error: insertError.message};
+    if (loanError || !loanRow) {
+      return {error: loanError?.message || 'Loan not found'};
     }
-  }
 
-  revalidatePath('/', 'layout');
-  return {success: true};
+    // Logic for binafsi is now supported below
+
+    const isBinafsi = loanRow.loan_type === 'binafsi';
+    const durationWeeks = isBinafsi
+      ? (loanRow.duration_months || 1)
+      : (Number(loanRow.cycle_count ?? 0) || 1);
+
+    let schedules: any[] = [];
+    if (isBinafsi) {
+      const durationMonths = durationWeeks;
+      const totalRepay = Number(loanRow.weekly_installment ?? 0);
+      const monthlyInstallment = totalRepay / durationMonths;
+      const firstReturnDate =
+        loanRow.return_start_date && loanRow.return_start_date.trim()
+          ? loanRow.return_start_date
+          : addMonthsToDateOnly(loanRow.disbursement_date, 1);
+
+      for (let month = 1; month <= durationMonths; month++) {
+        const expectedDate =
+          month === 1
+            ? firstReturnDate
+            : addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, month - 1);
+
+        if (!expectedDate) continue;
+
+        schedules.push({
+          loan_id: loanId,
+          week_number: month,
+          expected_date: expectedDate,
+          expected_amount: monthlyInstallment,
+          status: 'pending'
+        });
+      }
+    } else {
+      schedules = buildWeeklySchedules({
+        loanId,
+        disbursementDate: loanRow.disbursement_date,
+        returnStartDate: loanRow.return_start_date,
+        repaymentFrequency: loanRow.repayment_frequency ?? 'weekly',
+        durationWeeks,
+        installmentSize: Number(loanRow.weekly_installment ?? 0),
+        outstandingBalance: Number(loanRow.outstanding_balance ?? 0)
+      });
+    }
+
+    const {error: deleteError} = await supabase
+      .from('loan_schedules')
+      .delete()
+      .eq('loan_id', loanId);
+
+    if (deleteError) {
+      return {error: deleteError.message};
+    }
+
+    if (schedules.length > 0) {
+      const {error: insertError} = await supabase
+        .from('loan_schedules')
+        .insert(schedules);
+      if (insertError) {
+        return {error: insertError.message};
+      }
+    }
+
+    revalidatePath('/', 'layout');
+    return {success: true};
+  } catch (err: any) {
+    console.error('Regeneration failed:', err);
+    return {error: err.message || 'An unexpected error occurred during regeneration.'};
+  }
 }
 
 export async function regenerateGroupSchedulesAction(groupId: string) {

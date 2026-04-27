@@ -61,6 +61,24 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
   }, [installment]);
 
   useEffect(() => {
+    if (disbursementDate && !returnStartDate) {
+      const parts = disbursementDate.split('-').map(Number);
+      if (parts.length === 3) {
+        const d = new Date(Date.UTC(parts[0], parts[1], parts[2]));
+        // Add 1 month
+        const day = d.getUTCDate();
+        d.setUTCMonth(d.getUTCMonth() + 1);
+        if (d.getUTCDate() < day) d.setUTCDate(0);
+        
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dayStr = String(d.getUTCDate()).padStart(2, '0');
+        setReturnStartDate(`${y}-${m}-${dayStr}`);
+      }
+    }
+  }, [disbursementDate, returnStartDate]);
+
+  useEffect(() => {
     setTotalRepayDisplay(formatNumber(totalRepay));
   }, [totalRepay]);
 

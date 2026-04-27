@@ -21,90 +21,9 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
     setResolvedMembers(members);
   }, [members]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+  // Removed redundant and fragile client-side re-fetching that caused RLS issues for non-admins.
+  // We rely on the members passed from the parent which are fetched on the server.
 
-    const supabase = createClient();
-    let cancelled = false;
-
-    const loadMembers = async () => {
-      setLoading(true);
-      const links = await supabase
-        .from('group_members')
-        .select('member_id,role_in_group,joined_at')
-        .eq('group_id', groupId)
-        .order('joined_at', {ascending: true});
-
-      if (cancelled) {
-        return;
-      }
-
-      if (links.error || !links.data || links.data.length === 0) {
-        setResolvedMembers([]);
-        setLoading(false);
-        return;
-      }
-
-      const memberIds = links.data.map((row) => row.member_id);
-      const roleMap = new Map(
-        links.data.map((row) => [row.member_id, row.role_in_group ?? null])
-      );
-
-      const [membersResult, admissionResult] = await Promise.all([
-        supabase.from('members').select('id,member_number,full_name,phone').in('id', memberIds),
-        supabase.from('admission_books').select('member_id,has_book').in('member_id', memberIds)
-      ]);
-
-      if (cancelled) {
-        return;
-      }
-
-      if (membersResult.error || !membersResult.data) {
-        setResolvedMembers([]);
-        setLoading(false);
-        return;
-      }
-
-      const memberMap = new Map(
-        membersResult.data.map((member) => [
-          member.id,
-          {
-            memberNumber: member.member_number,
-            fullName: member.full_name,
-            phone: member.phone ?? null
-          }
-        ])
-      );
-
-      const admissionMap = new Map(
-        (admissionResult.data ?? []).map((row) => [row.member_id, row.has_book])
-      );
-
-      const mapped = memberIds.map((memberId) => {
-        const member = memberMap.get(memberId);
-        return {
-          id: `${groupId}-${memberId}`,
-          memberId,
-          memberNumber: member?.memberNumber ?? '-',
-          fullName: member?.fullName ?? '-',
-          phone: member?.phone ?? null,
-          roleInGroup: roleMap.get(memberId) ?? null,
-          hasBook: Boolean(admissionMap.get(memberId))
-        };
-      });
-
-      setResolvedMembers(mapped);
-      setLoading(false);
-    };
-
-    loadMembers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId, open]);
 
   const canAddLoan = resolvedMembers.length > 0;
 

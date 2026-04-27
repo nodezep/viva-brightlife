@@ -1,0 +1,9 @@
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  included_files = ["public/**"]
+
+# Scheduled functions are typically placed in netlify/functions
+# This netlify.toml entry serves as a reminder to set up the scheduler
+# if you use an external cron service to call the API endpoints.

@@ -36,6 +36,7 @@
     "sno": "S/No",
     "name": "Jina",
     "loan_amount": "Kiasi cha Mkopo",
+    "member_phone": "Namba ya Simu",
     "return_date": "Tarehe ya Rejesho",
     "days_overdue": "Idadi ya Siku za Malimbikizo",
     "interest_rate": "Asilimia ya Riba",
@@ -100,5 +101,11 @@
     "language": "Lugha",
     "theme": "Mandhari",
     "profile": "Wasifu"
+  },
+  "auth": {
+    "session_timeout_title": "Kipindi cha Muda Kuisha",
+    "session_timeout_description": "Umekuwa kimya kwa muda mrefu. Kwa sababu za kiusalama, utatolewa kwenye mfumo moja kwa moja baada ya muda mfupi. Je, unataka kuendelea kubaki kwenye mfumo?",
+    "stay_logged_in": "Endelea Kubaki",
+    "logging_out": "Inatoka..."
   }
 }
