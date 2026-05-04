@@ -38,7 +38,6 @@ type BusyState = 'queue' | 'dispatch' | 'approveAll' | `approve-${string}` | `re
 
 function StatusBadge({status}: {status: string}) {
   const map: Record<string, {label: string; cls: string}> = {
-    delivered:        {label: 'Delivered',        cls: 'bg-emerald-100 text-emerald-800 border-emerald-200'},
     sent:             {label: 'Sent',             cls: 'bg-blue-100 text-blue-800 border-blue-200'},
     failed:           {label: 'Failed',           cls: 'bg-red-100 text-red-800 border-red-200'},
     pending_approval: {label: 'Awaiting Review',  cls: 'bg-amber-100 text-amber-800 border-amber-200'},
@@ -205,7 +204,7 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
   // Test SMS state
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('Ndugu mteja, mkopo wako wa Viva Brightlife unakaribia kuisha. Tafadhali lipa kabla ya tarehe ya mwisho. Asante.');
-  const [logFilter, setLogFilter] = useState<'all' | 'sent' | 'delivered' | 'failed' | 'pending_approval'>('all');
+  const [logFilter, setLogFilter] = useState<'all' | 'sent' | 'failed' | 'pending_approval'>('all');
   const [logSearch, setLogSearch] = useState('');
 
   const showToast = (type: 'success' | 'error' | 'info' | 'warning', msg: string) => {
@@ -406,7 +405,7 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <InfoCard icon={<ClipboardList className="h-5 w-5" />} label="Awaiting Review" value={stats.pending} sub="Need your approval" />
         <InfoCard icon={<Inbox className="h-5 w-5" />} label="Ready to Send" value={stats.queued} sub="Approved, not yet sent" />
-        <InfoCard icon={<Send className="h-5 w-5" />} label="Sent Today" value={stats.sentToday} sub="Delivered today" />
+        <InfoCard icon={<Send className="h-5 w-5" />} label="Sent Today" value={stats.sentToday} sub="Successfully sent" />
         <InfoCard icon={<Calendar className="h-5 w-5" />} label="Due Soon" value={stats.dueSoon} sub="Next 3 days" />
         <InfoCard icon={<XCircle className="h-5 w-5" />} label="Failed" value={stats.failed} sub="Check history for details" />
       </div>
@@ -682,7 +681,7 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex gap-1 rounded-lg border bg-muted p-1">
-              {(['all', 'sent', 'delivered', 'pending_approval', 'failed'] as const).map(f => (
+              {(['all', 'sent', 'pending_approval', 'failed'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setLogFilter(f)}
@@ -717,7 +716,7 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
             <table className="w-full min-w-[1024px] text-sm">
               <thead className="border-b bg-muted/50">
                 <tr>
-                  {['Date', 'Phone', 'Type', 'Queue Status', 'Delivery', 'Sent At', 'Notes'].map(h => (
+                  {['Date', 'Phone', 'Type', 'Queue Status', 'Sent At', 'Notes'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -739,7 +738,6 @@ export function SmsRemindersModule({initialLogs, upcomingDue, pendingApprovals}:
                       {log.daysOverdue > 0 && <span className="ml-5 mt-0.5 block text-red-500">({log.daysOverdue}d)</span>}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={log.status} /></td>
-                    <td className="px-4 py-3"><StatusBadge status={log.deliveryStatus} /></td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {log.sentAt ? new Date(log.sentAt).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'}
                     </td>

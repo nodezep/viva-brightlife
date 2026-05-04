@@ -52,6 +52,7 @@ Set in `.env.local`:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SMS_PROVIDER` (`mock`, `twilio`, or `africastalking`)
 - `SMS_FROM`
+- `SMS_DEFAULT_COUNTRY_CODE` (optional; converts local numbers like `07...` to E.164, e.g. `255` for Tanzania)
 - `TWILIO_ACCOUNT_SID` (if using twilio)
 - `TWILIO_AUTH_TOKEN` (if using twilio)
 - `AFRICASTALKING_USERNAME` (if using Africa's Talking)

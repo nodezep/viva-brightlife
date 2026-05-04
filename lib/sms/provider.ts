@@ -5,11 +5,52 @@ export type SmsProviderResult = {
 };
 
 function normalizePhone(phone: string) {
-  const stripped = phone.replace(/\s+/g, '').replace(/[^\d+]/g, '');
-  if (stripped.startsWith('+')) {
-    return stripped;
+  const raw = phone.trim();
+  if (!raw) {
+    return '';
   }
-  return `+${stripped}`;
+
+  // Keep a leading "+" (E.164), but otherwise strip to digits only.
+  const hasPlus = raw.startsWith('+');
+  const digitsOnly = raw.replace(/[^\d]/g, '');
+
+  if (hasPlus) {
+    return `+${digitsOnly}`;
+  }
+
+  // Handle international prefix like 00...
+  if (digitsOnly.startsWith('00') && digitsOnly.length > 2) {
+    return `+${digitsOnly.slice(2)}`;
+  }
+
+  const defaultCountryCodeRaw = (process.env.SMS_DEFAULT_COUNTRY_CODE ?? '').trim();
+  const defaultCountryCode = defaultCountryCodeRaw.replace(/[^\d]/g, '');
+
+  // Handle local format starting with 0 (e.g., 07XXXXXXXX -> +2557XXXXXXXX)
+  if (digitsOnly.startsWith('0') && defaultCountryCode) {
+    return `+${defaultCountryCode}${digitsOnly.slice(1)}`;
+  }
+
+  // Handle local format starting with 7 or 6 (e.g., 7XXXXXXXX -> +2557XXXXXXXX)
+  // Tanzania numbers are usually 9 digits after the leading 0.
+  if (
+    defaultCountryCode === '255' &&
+    digitsOnly.length === 9 &&
+    (digitsOnly.startsWith('7') || digitsOnly.startsWith('6'))
+  ) {
+    return `+${defaultCountryCode}${digitsOnly}`;
+  }
+
+  if (defaultCountryCode && digitsOnly.startsWith(defaultCountryCode)) {
+    return `+${digitsOnly}`;
+  }
+
+  // Fallback: assume caller provided full number without "+".
+  return `+${digitsOnly}`;
+}
+
+function isValidE164(value: string) {
+  return /^\+[1-9]\d{6,14}$/.test(value);
 }
 
 async function sendWithTwilio(phone: string, message: string): Promise<SmsProviderResult> {
@@ -21,9 +62,14 @@ async function sendWithTwilio(phone: string, message: string): Promise<SmsProvid
     return {ok: false, error: 'Missing Twilio configuration'};
   }
 
+  const to = normalizePhone(phone);
+  if (!isValidE164(to)) {
+    return {ok: false, error: `Invalid phone number format: ${phone}`};
+  }
+
   const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
   const body = new URLSearchParams({
-    To: normalizePhone(phone),
+    To: to,
     From: from,
     Body: message
   });
@@ -74,13 +120,18 @@ async function sendWithAfricasTalking(
         apiKeyPrefix: apiKey ? apiKey.slice(0, 6) : null
       });
     }
-    return {ok: false, error: 'Missing Africa’s Talking configuration'};
+    return {ok: false, error: "Missing Africa's Talking configuration"};
+  }
+
+  const to = normalizePhone(phone);
+  if (!isValidE164(to)) {
+    return {ok: false, error: `Invalid phone number format: ${phone}`};
   }
 
   const endpoint = 'https://api.africastalking.com/version1/messaging';
   const body = new URLSearchParams({
     username,
-    to: normalizePhone(phone),
+    to,
     message
   });
 
@@ -133,20 +184,20 @@ async function sendWithAfricasTalking(
       error:
         payload?.errorMessage ??
         raw?.slice(0, 200) ??
-        'Africa’s Talking request failed'
+        "Africa's Talking request failed"
     };
   }
 
   const recipient = payload?.SMSMessageData?.Recipients?.[0];
   if (!recipient) {
-    return {ok: false, error: 'Africaâ€™s Talking response missing recipient data'};
+    return {ok: false, error: "Africa's Talking response missing recipient data"};
   }
 
   if (recipient.status && recipient.status.toLowerCase() !== 'success') {
     const statusCode = recipient.statusCode ?? 'unknown';
     return {
       ok: false,
-      error: `Africaâ€™s Talking status: ${recipient.status} (code ${statusCode})`
+      error: `Africa's Talking status: ${recipient.status} (code ${statusCode})`
     };
   }
 

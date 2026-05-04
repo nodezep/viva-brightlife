@@ -74,16 +74,17 @@ export async function checkAndExtendLoanIfOverdue(loanId: string) {
       const newCycle = Number(loan.cycle_count || 0) + addedMonths;
       const newDuration = Number(loan.duration_months || 0) + addedMonths;
 
-      // Update Loan
-      await supabase
-        .from('loans')
-        .update({
-          security_amount: newSecurity,
-          outstanding_balance: newBalance,
-          cycle_count: newCycle,
-          duration_months: newDuration
-        })
-        .eq('id', loanId);
+      // Update Loan via Atomic RPC
+      const {error: rpcError} = await supabase.rpc('adjust_loan_balance_and_terms', {
+        p_loan_id: loanId,
+        p_interest_delta: addedInterest,
+        p_cycle_delta: addedMonths
+      });
+
+      if (rpcError) {
+        console.error('Failed to adjust loan balance:', rpcError);
+        return;
+      }
 
       // Insert New Schedules
       await supabase.from('loan_schedules').insert(newSchedules);

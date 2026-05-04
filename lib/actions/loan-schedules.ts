@@ -238,29 +238,13 @@ export async function updateScheduleStatusAction(
           : 'Payment reversed'
       });
 
-      // 4. Update Loan Balance and Total Paid
-      const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
-      const newOutstanding = Math.max(0, currentOutstanding - delta);
-      
-      const currentTotalPaid = Number(loanRow.amount_withdrawn ?? 0);
-      const newTotalPaid = currentTotalPaid + delta;
+      // 4. Update Loan Balance and Total Paid via Atomic RPC
+      const {error: rpcError} = await supabase.rpc('record_loan_payment', {
+        p_loan_id: existing.loan_id,
+        p_delta: delta
+      });
 
-      const updatePayload: any = { 
-        outstanding_balance: newOutstanding,
-        amount_withdrawn: newTotalPaid
-      };
-      
-      // Auto-close if fully paid
-      if (newOutstanding <= 0) {
-        updatePayload.status = 'closed';
-      } else if (loanRow.status === 'closed' && newOutstanding > 0) {
-        updatePayload.status = 'active'; // Re-open if reversal happens
-      }
-
-      await supabase
-        .from('loans')
-        .update(updatePayload)
-        .eq('id', existing.loan_id);
+      if (rpcError) throw rpcError;
 
       if (loanRow.loan_type === 'binafsi') {
         const { data: futureSchedules } = await supabase
@@ -303,64 +287,103 @@ export async function regenerateLoanSchedulesAction(loanId: string) {
       return {error: loanError?.message || 'Loan not found'};
     }
 
-    // Logic for binafsi is now supported below
+    // 1. Get existing paid schedules to preserve them
+    const {data: existing} = await supabase
+      .from('loan_schedules')
+      .select('week_number, status, paid_amount, expected_amount, expected_date')
+      .eq('loan_id', loanId)
+      .order('week_number', {ascending: true});
 
+    const paidSchedules = (existing ?? []).filter(s => s.status === 'paid');
+    
     const isBinafsi = loanRow.loan_type === 'binafsi';
-    const durationWeeks = isBinafsi
+    const totalPeriods = isBinafsi
       ? (loanRow.duration_months || 1)
       : (Number(loanRow.cycle_count ?? 0) || 1);
 
-    let schedules: any[] = [];
+    const remainingPeriods = Math.max(0, totalPeriods - paidSchedules.length);
+    
+    if (remainingPeriods === 0 && paidSchedules.length > 0) {
+        // All periods are already paid, just delete pending/overdue ones
+        await supabase.from('loan_schedules').delete().eq('loan_id', loanId).neq('status', 'paid');
+        return {success: true};
+    }
+
+    let newSchedules: any[] = [];
     if (isBinafsi) {
-      const durationMonths = durationWeeks;
       const totalRepay = Number(loanRow.weekly_installment ?? 0);
-      const monthlyInstallment = totalRepay / durationMonths;
+      const monthlyInstallment = totalRepay / totalPeriods;
       const firstReturnDate =
         loanRow.return_start_date && loanRow.return_start_date.trim()
           ? loanRow.return_start_date
           : addMonthsToDateOnly(loanRow.disbursement_date, 1);
 
-      for (let month = 1; month <= durationMonths; month++) {
-        const expectedDate =
-          month === 1
-            ? firstReturnDate
-            : addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, month - 1);
+      for (let i = 1; i <= remainingPeriods; i++) {
+        const weekNum = paidSchedules.length + i;
+        const expectedDate = addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, weekNum - 1);
 
         if (!expectedDate) continue;
 
-        schedules.push({
+        newSchedules.push({
           loan_id: loanId,
-          week_number: month,
+          week_number: weekNum,
           expected_date: expectedDate,
           expected_amount: monthlyInstallment,
           status: 'pending'
         });
       }
     } else {
-      schedules = buildWeeklySchedules({
-        loanId,
-        disbursementDate: loanRow.disbursement_date,
-        returnStartDate: loanRow.return_start_date,
-        repaymentFrequency: loanRow.repayment_frequency ?? 'weekly',
-        durationWeeks,
-        installmentSize: Number(loanRow.weekly_installment ?? 0),
-        outstandingBalance: Number(loanRow.outstanding_balance ?? 0)
-      });
+      const installmentSize = Number(loanRow.weekly_installment ?? 0);
+      const outstandingBalance = Number(loanRow.outstanding_balance ?? 0);
+      const repaymentFrequency = loanRow.repayment_frequency ?? 'weekly';
+      
+      const defaultStart = getDefaultReturnStartDate(loanRow.disbursement_date, repaymentFrequency);
+      const startDate =
+        loanRow.return_start_date && loanRow.return_start_date.trim()
+          ? loanRow.return_start_date
+          : defaultStart || loanRow.disbursement_date;
+
+      const start = toUtcDate(startDate) ?? toUtcDate(loanRow.disbursement_date);
+      if (start) {
+          let currentDate = new Date(start);
+          const isDaily = repaymentFrequency === 'daily';
+          let remainingAmount = outstandingBalance;
+
+          for (let i = 1; i <= remainingPeriods; i++) {
+            const weekNum = paidSchedules.length + i;
+            if (i > 1) {
+              currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
+            }
+            const isLast = i === remainingPeriods;
+            let expectedAmount = isLast ? remainingAmount : Math.min(installmentSize, remainingAmount);
+            if (expectedAmount < 0) expectedAmount = 0;
+            remainingAmount -= expectedAmount;
+            
+            newSchedules.push({
+              loan_id: loanId,
+              week_number: weekNum,
+              expected_date: formatDateOnlyFromUtc(currentDate),
+              expected_amount: expectedAmount,
+              status: 'pending'
+            });
+          }
+      }
     }
 
     const {error: deleteError} = await supabase
       .from('loan_schedules')
       .delete()
-      .eq('loan_id', loanId);
+      .eq('loan_id', loanId)
+      .neq('status', 'paid');
 
     if (deleteError) {
       return {error: deleteError.message};
     }
 
-    if (schedules.length > 0) {
+    if (newSchedules.length > 0) {
       const {error: insertError} = await supabase
         .from('loan_schedules')
-        .insert(schedules);
+        .insert(newSchedules);
       if (insertError) {
         return {error: insertError.message};
       }
@@ -391,34 +414,7 @@ export async function regenerateGroupSchedulesAction(groupId: string) {
     if (loan.loan_type === 'binafsi') {
       continue;
     }
-    const durationWeeks = Number(loan.cycle_count ?? 0) || 1;
-    const schedules = buildWeeklySchedules({
-      loanId: loan.id,
-      disbursementDate: loan.disbursement_date,
-      returnStartDate: loan.return_start_date,
-      repaymentFrequency: loan.repayment_frequency ?? 'weekly',
-      durationWeeks,
-      installmentSize: Number(loan.weekly_installment ?? 0),
-      outstandingBalance: Number(loan.outstanding_balance ?? 0)
-    });
-
-    const {error: deleteError} = await supabase
-      .from('loan_schedules')
-      .delete()
-      .eq('loan_id', loan.id);
-
-    if (deleteError) {
-      return {error: deleteError.message};
-    }
-
-    if (schedules.length > 0) {
-      const {error: insertError} = await supabase
-        .from('loan_schedules')
-        .insert(schedules);
-      if (insertError) {
-        return {error: insertError.message};
-      }
-    }
+    await regenerateLoanSchedulesAction(loan.id);
   }
 
   revalidatePath('/', 'layout');
@@ -515,22 +511,13 @@ export async function markGroupSchedulesPaidAction(
 
     const delta = newPaidAmount - oldPaid;
     if (delta !== 0) {
-      const currentOutstanding = Number(loanRow.outstanding_balance ?? 0);
-      const newOutstanding = currentOutstanding - delta;
-      
-      const currentTotalPaid = Number(loanRow.amount_withdrawn ?? 0);
-      const newTotalPaid = currentTotalPaid + delta;
+      const {error: rpcError} = await supabase.rpc('record_loan_payment', {
+        p_loan_id: row.loan_id,
+        p_delta: delta
+      });
 
-      const {error: updateLoanError} = await supabase
-        .from('loans')
-        .update({
-          outstanding_balance: newOutstanding,
-          amount_withdrawn: newTotalPaid
-        })
-        .eq('id', row.loan_id);
-
-      if (updateLoanError) {
-        errors.push(updateLoanError.message);
+      if (rpcError) {
+        errors.push(rpcError.message);
         continue;
       }
     }

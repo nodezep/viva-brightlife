@@ -101,18 +101,6 @@ export async function createLoanAction(formData: FormData) {
     ].filter(Boolean).join(' | ');
   }
 
-  // Enforce admission book for group loans
-  if (loanType === 'vikundi_wakinamama' && memberIdFromForm) {
-    const {data: admissionRow} = await supabase
-      .from('admission_books')
-      .select('has_book')
-      .eq('member_id', memberIdFromForm)
-      .maybeSingle();
-
-    if (!admissionRow?.has_book) {
-      return { error: 'Member is not approved in the admission book.' };
-    }
-  }
 
   // Find or create member matching memberNumber (or use provided memberId)
   let memberId = '';

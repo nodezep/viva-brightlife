@@ -160,24 +160,31 @@ async function getRecentlyMessagedMembers(memberIds: string[]) {
 export async function queueOverdueReminders() {
   const supabase = createAdminClient();
 
-  const [{data: rulesData}, {data: loansData}, templates] = await Promise.all([
+  const [rulesRes, _, loansRes, templates] = await Promise.all([
     supabase
       .from('sms_reminder_rules')
       .select('id,rule_key,days_overdue,send_hour_local')
       .eq('is_active', true)
       .order('days_overdue', {ascending: true}),
+    // 1. Cleanup stale reminders before queuing new ones
+    supabase
+      .from('sms_reminders')
+      .update({status: 'cancelled', error_message: 'Date passed without sending'})
+      .in('status', ['pending_approval', 'queued'])
+      .lt('scheduled_for', new Date().toISOString()),
     supabase
       .from('loans')
       .select(
         'id,loan_number,disbursement_date,duration_months,overdue_amount,outstanding_balance,repayment_frequency,members(id,full_name,phone)'
       )
       .eq('status', 'active')
-      .gt('outstanding_balance', 0),
+      .gt('outstanding_balance', 0)
+      .gt('overdue_amount', 0),
     getTemplates('repayment_overdue')
   ]);
 
-  const rules = (rulesData ?? []) as ReminderRule[];
-  const loans = (loansData ?? []) as CandidateLoan[];
+  const rules = (rulesRes.data ?? []) as ReminderRule[];
+  const loans = (loansRes.data ?? []) as CandidateLoan[];
 
   const memberIds = loans
     .map((loan) => pickOne(loan.members)?.id)
@@ -205,10 +212,7 @@ export async function queueOverdueReminders() {
       continue;
     }
 
-    const daysOverdue = Math.max(
-      loan.overdue_amount > 0 ? 1 : 0,
-      calculateDaysOverdue(loan.disbursement_date, loan.duration_months)
-    );
+    const daysOverdue = Math.max(1, calculateDaysOverdue(loan.disbursement_date, loan.duration_months));
 
     if (daysOverdue <= 0) {
       continue;
@@ -249,11 +253,11 @@ export async function queueOverdueReminders() {
           message,
           days_overdue: daysOverdue,
           scheduled_for: scheduled.toISOString(),
-          status: 'queued',
+          status: 'pending_approval',
           delivery_status: 'queued',
           provider_name: process.env.SMS_PROVIDER ?? 'mock'
         },
-        {onConflict: 'loan_id,reminder_key', ignoreDuplicates: true}
+        {onConflict: 'loan_id,reminder_key'}
       );
 
       if (!error) {
@@ -366,7 +370,7 @@ export async function queueUpcomingReminders() {
   const windowDays = getDueSoonWindowDays();
   const endDate = addDaysToIso(today, windowDays);
 
-  const [{data: scheduleRows}, templates] = await Promise.all([
+  const [scheduleRes, _, templates] = await Promise.all([
     supabase
       .from('loan_schedules')
       .select(
@@ -376,10 +380,16 @@ export async function queueUpcomingReminders() {
       .gte('expected_date', today)
       .lte('expected_date', endDate)
       .order('expected_date', {ascending: true}),
+    // Cleanup stale reminders
+    supabase
+      .from('sms_reminders')
+      .update({status: 'cancelled', error_message: 'Date passed without sending'})
+      .in('status', ['pending_approval', 'queued'])
+      .lt('scheduled_for', new Date().toISOString()),
     getTemplates('repayment_due_soon')
   ]);
 
-  const schedules = (scheduleRows ?? []) as UpcomingSchedule[];
+  const schedules = (scheduleRes.data ?? []) as UpcomingSchedule[];
   const memberIds = schedules
     .map((row) => pickOne(pickOne(row.loans)?.members)?.id)
     .filter((id): id is string => Boolean(id));
@@ -456,11 +466,11 @@ export async function queueUpcomingReminders() {
         message,
         days_overdue: 0,
         scheduled_for: scheduled.toISOString(),
-        status: 'queued',
+        status: 'pending_approval',
         delivery_status: 'queued',
         provider_name: process.env.SMS_PROVIDER ?? 'mock'
       },
-      {onConflict: 'loan_id,reminder_key', ignoreDuplicates: true}
+      {onConflict: 'loan_id,reminder_key'}
     );
 
     if (!error) {
@@ -526,7 +536,7 @@ export async function queueLoanReminder(loanId: string) {
       message,
       days_overdue: daysOverdue,
       scheduled_for: new Date().toISOString(),
-      status: 'queued',
+      status: 'pending_approval',
       delivery_status: 'queued',
       provider_name: process.env.SMS_PROVIDER ?? 'mock'
     },
