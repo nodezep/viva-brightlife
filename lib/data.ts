@@ -783,6 +783,27 @@ export async function getGroupDetail(groupId: string): Promise<GroupDetail | nul
     })
     .filter((row): row is GroupMemberDetail => Boolean(row));
 
+  // Always resolve `hasBook` via a direct query as well.
+  // This makes the result robust even when the nested relationship select fails
+  // (e.g. missing relationship in the DB, RLS quirks, or fallback queries).
+  const memberIds = members.map((row) => row.memberId).filter(Boolean);
+  if (memberIds.length > 0) {
+    const {data: admissionRows} = await supabase
+      .from('admission_books')
+      .select('member_id,has_book')
+      .in('member_id', memberIds);
+
+    const admissionMap = new Map(
+      (admissionRows ?? []).map((row) => [row.member_id, row.has_book])
+    );
+
+    for (const member of members) {
+      if (admissionMap.has(member.memberId)) {
+        member.hasBook = Boolean(admissionMap.get(member.memberId));
+      }
+    }
+  }
+
   return {
     id: data.id,
     groupName: data.group_name,

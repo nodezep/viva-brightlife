@@ -3,7 +3,6 @@
 import {useEffect, useState} from 'react';
 import {Plus} from 'lucide-react';
 import type {GroupMemberDetail} from '@/types';
-import {createClient} from '@/lib/supabase/client';
 import {GroupLoanForm} from './group-loan-form';
 
 type Props = {
@@ -25,7 +24,8 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
   // We rely on the members passed from the parent which are fetched on the server.
 
 
-  const canAddLoan = resolvedMembers.length > 0;
+  const eligibleMembers = resolvedMembers.filter((member) => member.hasBook);
+  const canAddLoan = eligibleMembers.length > 0;
 
   return (
     <div className="no-print">
@@ -41,7 +41,9 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
 
       {!canAddLoan ? (
         <p className="mb-3 rounded-md bg-amber-100 px-3 py-2 text-sm text-amber-800">
-          Add group members first before creating a loan.
+          {resolvedMembers.length === 0
+            ? 'Add group members first before creating a loan.'
+            : 'No members approved in the Admission Book for this group yet.'}
         </p>
       ) : null}
       {successMessage ? (
@@ -59,7 +61,7 @@ export function GroupLoanFormDialog({groupId, members}: Props) {
           ) : (
             <GroupLoanForm
               groupId={groupId}
-              members={resolvedMembers}
+              members={eligibleMembers}
               onClose={() => setOpen(false)}
               onSuccess={(message) => {
                 setSuccessMessage(message);

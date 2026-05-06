@@ -27,7 +27,7 @@ export function GroupLoanForm({groupId, members, onClose, onSuccess}: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState('');
-  const eligibleMembers = members;
+  const eligibleMembers = members.filter((member) => member.hasBook);
 
   const [totalRepay, setTotalRepay] = useState('');
   const [installment, setInstallment] = useState('');
@@ -80,7 +80,7 @@ export function GroupLoanForm({groupId, members, onClose, onSuccess}: Props) {
 
       {eligibleMembers.length === 0 ? (
         <p className="md:col-span-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          No members found in this group.
+          No members approved in the Admission Book for this group yet.
         </p>
       ) : null}
 
