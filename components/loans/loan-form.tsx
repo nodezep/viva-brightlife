@@ -65,10 +65,15 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
       const parts = disbursementDate.split('-').map(Number);
       if (parts.length === 3) {
         const d = new Date(Date.UTC(parts[0], parts[1], parts[2]));
-        // Add 1 month
         const day = d.getUTCDate();
-        d.setUTCMonth(d.getUTCMonth() + 1);
-        if (d.getUTCDate() < day) d.setUTCDate(0);
+        if (repaymentFrequency === 'monthly') {
+          d.setUTCMonth(d.getUTCMonth() + 1);
+          if (d.getUTCDate() < day) d.setUTCDate(0);
+        } else if (repaymentFrequency === 'weekly') {
+          d.setUTCDate(d.getUTCDate() + 7);
+        } else if (repaymentFrequency === 'daily') {
+          d.setUTCDate(d.getUTCDate() + 1);
+        }
         
         const y = d.getUTCFullYear();
         const m = String(d.getUTCMonth() + 1).padStart(2, '0');
@@ -76,7 +81,7 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
         setReturnStartDate(`${y}-${m}-${dayStr}`);
       }
     }
-  }, [disbursementDate, returnStartDate]);
+  }, [disbursementDate, returnStartDate, repaymentFrequency]);
 
   useEffect(() => {
     setTotalRepayDisplay(formatNumber(totalRepay));
@@ -188,7 +193,32 @@ export function LoanForm({loanType, onClose, onSuccess}: Props) {
               step="0.01"
             />
           </Field>
-          <Field label="Muda wa Mkopo (Mwezi)">
+          <div className="relative">
+            <select
+              className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"
+              value={repaymentFrequency}
+              onChange={(e) =>
+                setRepaymentFrequency(e.target.value as 'weekly' | 'daily' | 'monthly')
+              }
+              name="repaymentFrequency"
+            >
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="daily">Daily</option>
+            </select>
+            <label className="pointer-events-none absolute left-3 top-1 text-[10px] font-bold uppercase tracking-wider text-primary/50 transition-all peer-focus:top-1 peer-focus:text-[10px] peer-focus:font-bold peer-focus:text-primary">
+              Repayment Frequency
+            </label>
+          </div>
+          <Field 
+            label={
+              repaymentFrequency === 'monthly' 
+                ? "Muda wa Mkopo (Mwezi)" 
+                : repaymentFrequency === 'weekly' 
+                  ? "Muda wa Mkopo (Wiki)" 
+                  : "Muda wa Mkopo (Siku)"
+            }
+          >
             <input
               type="number"
               className="peer w-full rounded-lg border bg-background px-3 pt-5 pb-1 text-sm outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/10"

@@ -98,7 +98,7 @@ export async function getLoanSchedulesAction(loanId: string) {
 
   const {data: loanRow, error: loanError} = await supabase
     .from('loans')
-    .select('loan_type, disbursement_date, duration_months, weekly_installment, status, return_start_date')
+    .select('loan_type, disbursement_date, duration_months, weekly_installment, status, return_start_date, repayment_frequency')
     .eq('id', loanId)
     .single();
 
@@ -120,26 +120,34 @@ export async function getLoanSchedulesAction(loanId: string) {
     return data;
   }
 
+  const repaymentFrequency = loanRow.repayment_frequency || 'monthly';
   const monthlyInstallment = totalRepay / durationMonths;
   const schedules = [];
 
   const firstReturnDate =
     loanRow.return_start_date && loanRow.return_start_date.trim()
       ? loanRow.return_start_date
-      : addMonthsToDateOnly(loanRow.disbursement_date, 1);
+      : (repaymentFrequency === 'monthly'
+        ? addMonthsToDateOnly(loanRow.disbursement_date, 1)
+        : addDaysToDateOnly(loanRow.disbursement_date, repaymentFrequency === 'daily' ? 1 : 7));
 
-  for (let month = 1; month <= durationMonths; month++) {
-    const expectedDate =
-      month === 1
+  for (let i = 1; i <= durationMonths; i++) {
+    let expectedDate: string | null = null;
+    if (repaymentFrequency === 'monthly') {
+      expectedDate = i === 1
         ? firstReturnDate
-        : addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, month - 1);
+        : addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, i - 1);
+    } else {
+      const daysToAdd = (i - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
+      expectedDate = addDaysToDateOnly(firstReturnDate ?? loanRow.disbursement_date, daysToAdd);
+    }
 
     if (!expectedDate) {
       continue;
     }
     schedules.push({
       loan_id: loanId,
-      week_number: month,
+      week_number: i,
       expected_date: expectedDate,
       expected_amount: monthlyInstallment,
       status: 'pending'
@@ -312,15 +320,25 @@ export async function regenerateLoanSchedulesAction(loanId: string) {
     let newSchedules: any[] = [];
     if (isBinafsi) {
       const totalRepay = Number(loanRow.weekly_installment ?? 0);
+      const repaymentFrequency = loanRow.repayment_frequency || 'monthly';
       const monthlyInstallment = totalRepay / totalPeriods;
       const firstReturnDate =
         loanRow.return_start_date && loanRow.return_start_date.trim()
           ? loanRow.return_start_date
-          : addMonthsToDateOnly(loanRow.disbursement_date, 1);
+          : (repaymentFrequency === 'monthly'
+            ? addMonthsToDateOnly(loanRow.disbursement_date, 1)
+            : addDaysToDateOnly(loanRow.disbursement_date, repaymentFrequency === 'daily' ? 1 : 7));
 
       for (let i = 1; i <= remainingPeriods; i++) {
         const weekNum = paidSchedules.length + i;
-        const expectedDate = addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, weekNum - 1);
+        let expectedDate: string | null = null;
+        
+        if (repaymentFrequency === 'monthly') {
+          expectedDate = addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, weekNum - 1);
+        } else {
+          const daysToAdd = (weekNum - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
+          expectedDate = addDaysToDateOnly(firstReturnDate ?? loanRow.disbursement_date, daysToAdd);
+        }
 
         if (!expectedDate) continue;
 

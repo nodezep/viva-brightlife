@@ -9,6 +9,7 @@ import {useRouter} from '@/lib/navigation';
 type Props = {
   loanId: string;
   loanType?: string;
+  repaymentFrequency?: 'weekly' | 'daily' | 'monthly';
   onClose: () => void;
 };
 
@@ -21,11 +22,13 @@ type Schedule = {
   status: string;
 };
 
-export function LoanSchedulesDialog({loanId, loanType, onClose}: Props) {
+export function LoanSchedulesDialog({loanId, loanType, repaymentFrequency, onClose}: Props) {
   const t = useTranslations();
   const router = useRouter();
-  const isMonthly = loanType === 'binafsi';
-  const periodLabel = isMonthly ? 'Mwezi' : 'Week';
+  
+  const periodLabel = loanType === 'binafsi' 
+    ? (repaymentFrequency === 'monthly' ? 'Mwezi' : repaymentFrequency === 'weekly' ? 'Wiki' : 'Siku')
+    : 'Week';
   
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);

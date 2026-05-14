@@ -15,7 +15,7 @@ import type {
   InsuranceView
 } from '@/types';
 import {checkAndExtendLoanIfOverdue} from './actions/loan-utils';
-import {addMonthsToDateOnly} from '@/lib/date-only';
+import {addMonthsToDateOnly, addDaysToDateOnly} from '@/lib/date-only';
 
 type LoanRow = {
   id: string;
@@ -61,6 +61,20 @@ function getTodayIsoLocal(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getExpectedReturnDate(isoDate: string, periods: number, frequency: string): string | null {
+  if (periods <= 0) {
+    return null;
+  }
+  if (frequency === 'monthly') {
+    return addMonthsToDateOnly(isoDate, periods);
+  } else if (frequency === 'weekly') {
+    return addDaysToDateOnly(isoDate, periods * 7);
+  } else if (frequency === 'daily') {
+    return addDaysToDateOnly(isoDate, periods);
+  }
+  return addMonthsToDateOnly(isoDate, periods);
 }
 
 function addMonthsToIso(isoDate: string, months: number): string | null {
@@ -297,7 +311,11 @@ export async function getLoansByType(
           record.durationMonths && record.durationMonths > 0
             ? record.durationMonths
             : record.cycle;
-        const returnDate = addMonthsToIso(record.disbursementDate, durationMonths);
+        const returnDate = getExpectedReturnDate(
+          record.disbursementDate,
+          durationMonths,
+          record.repaymentFrequency || 'monthly'
+        );
         if (!returnDate) {
           return {...record, daysOverdue: 0, overdueAmount: 0};
         }
@@ -356,7 +374,11 @@ export async function getAllLoans(): Promise<LoanRecord[]> {
         record.durationMonths && record.durationMonths > 0
           ? record.durationMonths
           : record.cycle;
-      const returnDate = addMonthsToIso(record.disbursementDate, durationMonths);
+      const returnDate = getExpectedReturnDate(
+        record.disbursementDate,
+        durationMonths,
+        record.repaymentFrequency || 'monthly'
+      );
       if (!returnDate) {
         return {...record, daysOverdue: 0, overdueAmount: 0};
       }

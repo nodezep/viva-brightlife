@@ -2,7 +2,7 @@
 
 import {createClient} from '@/lib/supabase/server';
 import {revalidatePath} from 'next/cache';
-import {addMonthsToDateOnly} from '@/lib/date-only';
+import {addMonthsToDateOnly, addDaysToDateOnly} from '@/lib/date-only';
 
 function getTodayIsoLocal(): string {
   const now = new Date();
@@ -36,50 +36,56 @@ export async function checkAndExtendLoanIfOverdue(loanId: string) {
     return;
   }
 
-  const today = getTodayIsoLocal();
-  let latestDate = schedules[schedules.length - 1].expected_date;
-  const lastIsUnpaid = schedules[schedules.length - 1].status !== 'paid';
+    const today = getTodayIsoLocal();
+    let latestDate = schedules[schedules.length - 1].expected_date;
+    const lastIsUnpaid = schedules[schedules.length - 1].status !== 'paid';
 
-  if (latestDate && latestDate < today && lastIsUnpaid) {
-    const newSchedules = [];
-    let addedMonths = 0;
-    const principal = Number(loan.principal_amount || 0);
-    const rate = Number(loan.interest_rate || 0);
-    const monthlyInterest = (principal * rate) / 100;
-    
-    let currentBalance = Number(loan.outstanding_balance || 0);
-    let cursorDate = latestDate;
-    while (cursorDate < today) {
-      addedMonths++;
-      const nextDate = addMonthsToDateOnly(cursorDate, 1);
-      if (!nextDate) break;
-      cursorDate = nextDate;
-      
-      currentBalance += monthlyInterest;
+    if (latestDate && latestDate < today && lastIsUnpaid) {
+      const repaymentFrequency = loan.repayment_frequency || 'monthly';
+      const newSchedules = [];
+      let addedPeriods = 0;
+      const principal = Number(loan.principal_amount || 0);
+      const rate = Number(loan.interest_rate || 0);
 
-      newSchedules.push({
-        loan_id: loanId,
-        week_number: schedules.length + addedMonths,
-        expected_date: nextDate,
-        expected_amount: currentBalance,
-        status: 'overdue'
-      });
-    }
+      // Interest logic remains monthly, so we adjust the rate per period
+      let periodInterest = (principal * rate) / 100;
+      if (repaymentFrequency === 'weekly') {
+        periodInterest = periodInterest / 4;
+      } else if (repaymentFrequency === 'daily') {
+        periodInterest = periodInterest / 30;
+      }
 
-    if (newSchedules.length > 0) {
-      const addedInterest = monthlyInterest * addedMonths;
+      let currentBalance = Number(loan.outstanding_balance || 0);
+      let cursorDate = latestDate;
+      while (cursorDate < today) {
+        addedPeriods++;
+        const nextDate = repaymentFrequency === 'monthly'
+          ? addMonthsToDateOnly(cursorDate, 1)
+          : addDaysToDateOnly(cursorDate, repaymentFrequency === 'daily' ? 1 : 7);
 
-      const newSecurity = Number(loan.security_amount || 0) + addedInterest;
-      const newBalance = Number(loan.outstanding_balance || 0) + addedInterest;
-      const newCycle = Number(loan.cycle_count || 0) + addedMonths;
-      const newDuration = Number(loan.duration_months || 0) + addedMonths;
+        if (!nextDate) break;
+        cursorDate = nextDate;
 
-      // Update Loan via Atomic RPC
-      const {error: rpcError} = await supabase.rpc('adjust_loan_balance_and_terms', {
-        p_loan_id: loanId,
-        p_interest_delta: addedInterest,
-        p_cycle_delta: addedMonths
-      });
+        currentBalance += periodInterest;
+
+        newSchedules.push({
+          loan_id: loanId,
+          week_number: schedules.length + addedPeriods,
+          expected_date: nextDate,
+          expected_amount: currentBalance,
+          status: 'overdue'
+        });
+      }
+
+      if (newSchedules.length > 0) {
+        const totalAddedInterest = periodInterest * addedPeriods;
+
+        // Update Loan via Atomic RPC
+        const {error: rpcError} = await supabase.rpc('adjust_loan_balance_and_terms', {
+          p_loan_id: loanId,
+          p_interest_delta: totalAddedInterest,
+          p_cycle_delta: addedPeriods
+        });
 
       if (rpcError) {
         console.error('Failed to adjust loan balance:', rpcError);

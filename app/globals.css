@@ -56,12 +56,13 @@ body {
 
 @media print {
   @page {
-    size: landscape;
     margin: 12mm;
+    size: auto;
   }
 
   body {
     overflow: visible !important;
+    background: white !important;
   }
 
   .no-print {
@@ -70,50 +71,6 @@ body {
 
   .print-only {
     display: block !important;
-  }
-
-  .print-fit,
-  .print-fit .overflow-x-auto {
-    overflow: visible !important;
-  }
-
-  .print-fit table {
-    width: 100% !important;
-    table-layout: fixed;
-  }
-
-  .print-fit th,
-  .print-fit td {
-    padding: 4px !important;
-    font-size: 10px !important;
-    white-space: nowrap;
-    border-color: #475569 !important;
-  }
-
-  .print-fit tr {
-    border-color: #475569 !important;
-  }
-
-  .print-fit tbody tr:nth-child(even) {
-    background-color: #d9e8ff !important;
-  }
-
-  .print-pdf .print-header {
-    padding: 6px 10px !important;
-    border-radius: 8px !important;
-  }
-
-  .print-pdf .print-table {
-    margin-top: 2px !important;
-    border-radius: 8px !important;
-  }
-
-  .print-area {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    color: #000;
-    background: #fff;
   }
 }
 
@@ -126,6 +83,7 @@ body {
     opacity: 0;
     transform: translateY(12px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -133,10 +91,12 @@ body {
 }
 
 @keyframes reportFloat {
+
   0%,
   100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-6px);
   }
@@ -146,23 +106,23 @@ body {
   animation: reportFadeUp 600ms ease-out both;
 }
 
-.report-stagger > * {
+.report-stagger>* {
   animation: reportFadeUp 600ms ease-out both;
 }
 
-.report-stagger > *:nth-child(1) {
+.report-stagger>*:nth-child(1) {
   animation-delay: 40ms;
 }
 
-.report-stagger > *:nth-child(2) {
+.report-stagger>*:nth-child(2) {
   animation-delay: 80ms;
 }
 
-.report-stagger > *:nth-child(3) {
+.report-stagger>*:nth-child(3) {
   animation-delay: 120ms;
 }
 
-.report-stagger > *:nth-child(4) {
+.report-stagger>*:nth-child(4) {
   animation-delay: 160ms;
 }
 

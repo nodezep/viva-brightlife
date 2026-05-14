@@ -68,7 +68,16 @@ export async function createLoanAction(formData: FormData) {
   if (loanType === 'binafsi') {
     const interestRateDecimal = interestRate / 100;
     interestRatePercent = interestRate;
-    securityAmount = principalAmount * interestRateDecimal * Math.max(1, durationMonths);
+    
+    // Calculate duration in months for interest calculation
+    let effectiveMonths = durationMonths;
+    if (repaymentFrequency === 'weekly') {
+      effectiveMonths = durationMonths / 4;
+    } else if (repaymentFrequency === 'daily') {
+      effectiveMonths = durationMonths / 30;
+    }
+    
+    securityAmount = principalAmount * interestRateDecimal * Math.max(0.1, effectiveMonths);
     installmentSize = principalAmount + securityAmount;
     outstandingBalance = Math.max(installmentSize - amountPaid, 0);
   }
@@ -165,13 +174,15 @@ export async function createLoanAction(formData: FormData) {
     insertPayload.amount_withdrawn = amountPaid;
     insertPayload.interest_rate = interestRatePercent;
     insertPayload.days_overdue = daysOverdue;
-    insertPayload.repayment_frequency = 'monthly';
+    insertPayload.repayment_frequency = repaymentFrequency;
   } else {
     insertPayload.repayment_frequency = repaymentFrequency;
   }
 
   const defaultReturnStart = loanType === 'binafsi' 
-    ? addMonthsToDateOnly(disbursementDate, 1)
+    ? (repaymentFrequency === 'monthly' 
+        ? addMonthsToDateOnly(disbursementDate, 1) 
+        : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7))
     : getDefaultReturnStartDate(disbursementDate, repaymentFrequency);
 
   insertPayload.return_start_date =
@@ -245,40 +256,41 @@ export async function createLoanAction(formData: FormData) {
       }
     }
   } else if (loanType === 'binafsi' && durationMonths > 0) {
-    // Generate monthly schedules - one entry per month
+    // Generate schedules based on frequency
     const schedules = [];
-    // Calculate monthly installment (total repayment divided by months)
-    const monthlyInstallment = installmentSize / durationMonths;
+    const periodInstallment = installmentSize / durationMonths;
 
     const firstReturnDate =
       returnStartDateRaw && returnStartDateRaw.trim()
         ? returnStartDateRaw
-        : addMonthsToDateOnly(disbursementDate, 1);
+        : repaymentFrequency === 'monthly'
+        ? addMonthsToDateOnly(disbursementDate, 1)
+        : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
 
-    for (let month = 1; month <= durationMonths; month++) {
-      const expectedDate =
-        month === 1
+    for (let i = 1; i <= durationMonths; i++) {
+      let expectedDate: string | null = null;
+      if (repaymentFrequency === 'monthly') {
+        expectedDate = i === 1
           ? firstReturnDate
-          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, month - 1);
-
-      if (!expectedDate) {
-        continue;
+          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, i - 1);
+      } else {
+        const daysToAdd = (i - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
+        expectedDate = addDaysToDateOnly(firstReturnDate ?? disbursementDate, daysToAdd);
       }
 
-      const expectedAmount = monthlyInstallment;
+      if (!expectedDate) continue;
 
       schedules.push({
         loan_id: loanId,
-        week_number: month,
+        week_number: i,
         expected_date: expectedDate,
-        expected_amount: expectedAmount,
+        expected_amount: periodInstallment,
         status: 'pending'
       });
     }
 
     if (schedules.length > 0) {
       const { error: scheduleError } = await supabase.from('loan_schedules').insert(schedules);
-
       if (scheduleError) {
         console.error('Failed to create loan schedules:', scheduleError);
       }
@@ -356,7 +368,16 @@ export async function updateLoanAction(formData: FormData) {
   if (loanType === 'binafsi') {
     const interestRateDecimal = interestRate / 100;
     interestRatePercent = interestRate;
-    securityAmount = principalAmount * interestRateDecimal * Math.max(1, durationMonths);
+    
+    // Calculate duration in months for interest calculation
+    let effectiveMonths = durationMonths;
+    if (repaymentFrequency === 'weekly') {
+      effectiveMonths = durationMonths / 4;
+    } else if (repaymentFrequency === 'daily') {
+      effectiveMonths = durationMonths / 30;
+    }
+
+    securityAmount = principalAmount * interestRateDecimal * Math.max(0.1, effectiveMonths);
     installmentSize = principalAmount + securityAmount;
     outstandingBalance = Math.max(installmentSize - amountPaid, 0);
   }
@@ -396,13 +417,15 @@ export async function updateLoanAction(formData: FormData) {
     updatePayload.amount_withdrawn = amountPaid;
     updatePayload.interest_rate = interestRatePercent;
     updatePayload.days_overdue = daysOverdue;
-    updatePayload.repayment_frequency = 'monthly';
+    updatePayload.repayment_frequency = repaymentFrequency;
   } else {
     updatePayload.repayment_frequency = repaymentFrequency;
   }
 
   const defaultReturnStart = loanType === 'binafsi'
-    ? addMonthsToDateOnly(disbursementDate, 1)
+    ? (repaymentFrequency === 'monthly'
+        ? addMonthsToDateOnly(disbursementDate, 1)
+        : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7))
     : getDefaultReturnStartDate(disbursementDate, repaymentFrequency);
 
   updatePayload.return_start_date =
@@ -498,33 +521,35 @@ export async function updateLoanAction(formData: FormData) {
       return {error: deleteError.message};
     }
 
-    // Generate monthly schedules - one entry per month
+    // Generate schedules based on frequency
     const schedules = [];
-    // Calculate monthly installment (total repayment divided by months)
-    const monthlyInstallment = installmentSize / durationMonths;
+    const periodInstallment = installmentSize / durationMonths;
 
     const firstReturnDate =
       returnStartDateRaw && returnStartDateRaw.trim()
         ? returnStartDateRaw
-        : addMonthsToDateOnly(disbursementDate, 1);
+        : repaymentFrequency === 'monthly'
+        ? addMonthsToDateOnly(disbursementDate, 1)
+        : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
 
-    for (let month = 1; month <= durationMonths; month++) {
-      const expectedDate =
-        month === 1
+    for (let i = 1; i <= durationMonths; i++) {
+      let expectedDate: string | null = null;
+      if (repaymentFrequency === 'monthly') {
+        expectedDate = i === 1
           ? firstReturnDate
-          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, month - 1);
-
-      if (!expectedDate) {
-        continue;
+          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, i - 1);
+      } else {
+        const daysToAdd = (i - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
+        expectedDate = addDaysToDateOnly(firstReturnDate ?? disbursementDate, daysToAdd);
       }
 
-      const expectedAmount = monthlyInstallment;
+      if (!expectedDate) continue;
 
       schedules.push({
         loan_id: loanId,
-        week_number: month,
+        week_number: i,
         expected_date: expectedDate,
-        expected_amount: expectedAmount,
+        expected_amount: periodInstallment,
         status: 'pending'
       });
     }
