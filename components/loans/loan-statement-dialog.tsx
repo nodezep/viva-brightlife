@@ -279,24 +279,26 @@ export function LoanStatementDialog({ loan, onClose }: Props) {
 
       <style jsx global>{`
         @media print {
-          /* Hide everything, then reveal only the statement overlay */
+          /* Remove everything from layout, then print only the statement overlay */
           body * {
-            visibility: hidden !important;
+            display: none !important;
           }
 
           #statement-modal-overlay,
           #statement-modal-overlay * {
-            visibility: visible !important;
+            display: revert !important;
+          }
+
+          html, body {
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
           }
 
           #statement-modal-overlay {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            right: 0 !important;
-            bottom: auto !important;
+            position: static !important;
             inset: auto !important;
-            display: block !important;
             background: none !important;
             padding: 0 !important;
             backdrop-filter: none !important;
