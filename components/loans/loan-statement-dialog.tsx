@@ -104,60 +104,6 @@ export function LoanStatementDialog({ loan, onClose }: Props) {
     ? Math.min((totals.totalPaid / totals.totalExpected) * 100, 100)
     : 0;
 
-  const handlePrint = () => {
-    const printable = document.getElementById('statement-printable-document');
-    if (!printable) {
-      window.print();
-      return;
-    }
-
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=768');
-    if (!printWindow) {
-      window.print();
-      return;
-    }
-
-    const styles = Array.from(
-      document.querySelectorAll('style, link[rel="stylesheet"]')
-    )
-      .map((node) => (node as HTMLElement).outerHTML)
-      .join('\n');
-
-    const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    ${styles}
-    <style>
-      @page { size: A4 portrait; margin: 12mm; }
-      html, body { background: #fff !important; }
-      body { margin: 0 !important; }
-    </style>
-  </head>
-  <body>
-    ${printable.outerHTML}
-  </body>
-</html>`;
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-
-    const doPrint = () => {
-      printWindow.focus();
-      printWindow.print();
-    };
-
-    printWindow.onload = () => {
-      setTimeout(doPrint, 300);
-    };
-
-    printWindow.onafterprint = () => {
-      printWindow.close();
-    };
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm print:bg-transparent print:p-0" id="statement-modal-overlay">
       <div 
@@ -173,7 +119,7 @@ export function LoanStatementDialog({ loan, onClose }: Props) {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={handlePrint}
+              onClick={() => window.print()}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-black text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
             >
               <Printer size={18} /> PRINT
@@ -344,12 +290,17 @@ export function LoanStatementDialog({ loan, onClose }: Props) {
           }
 
           #statement-modal-overlay {
-            position: static !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            right: 0 !important;
+            bottom: auto !important;
             inset: auto !important;
             display: block !important;
             background: none !important;
             padding: 0 !important;
             backdrop-filter: none !important;
+            transform: none !important;
           }
 
           #statement-printable-document {
