@@ -5,8 +5,7 @@ import { Trash2, CalendarDays, FileText, Paperclip } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { LoanRecord, LoanType } from '@/types';
 import { deleteLoanAction } from '@/lib/actions/loan';
-import { LoanSchedulesDialog } from './loan-schedules-dialog';
-import { LoanStatementDialog } from './loan-statement-dialog';
+import { LoanDetailsDialog } from './loan-details-dialog';
 import { MemberDocumentsDialog } from './member-documents-dialog';
 import { LoanEditForm } from './loan-edit-form';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -28,9 +27,9 @@ const currency = new Intl.NumberFormat('en-US', {
 export function LoanTable({ loanType, rows, count }: Props) {
   const t = useTranslations();
   const [isPending, startTransition] = useTransition();
-  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+  const [detailLoan, setDetailLoan] = useState<LoanRecord | null>(null);
+  const [detailTab, setDetailTab] = useState<'schedule' | 'statement'>('schedule');
   const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
-  const [statementLoan, setStatementLoan] = useState<LoanRecord | null>(null);
   const [docsLoan, setDocsLoan] = useState<LoanRecord | null>(null);
   const isIndividual = loanType === 'binafsi';
   const isElectronics = loanType === 'electronics';
@@ -39,6 +38,13 @@ export function LoanTable({ loanType, rows, count }: Props) {
   const { profile } = useProfile();
   const [permissionError, setPermissionError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // ... (rest of the logic remains similar but triggers setDetailLoan)
+
+  const handleOpenDetails = (loan: LoanRecord, tab: 'schedule' | 'statement') => {
+    setDetailTab(tab);
+    setDetailLoan(loan);
+  };
 
   const totals = rows.reduce(
     (acc, row) => {
@@ -295,22 +301,22 @@ export function LoanTable({ loanType, rows, count }: Props) {
 
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
-                        className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                        onClick={() => setSelectedLoanId(row.id)}
+                        className="inline-flex items-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-1.5 text-[10px] font-black text-primary hover:bg-primary hover:text-white transition-all active:scale-95 shadow-sm"
+                        onClick={() => handleOpenDetails(row, 'schedule')}
                       >
-                        <CalendarDays size={12} /> Marejesho
+                        <CalendarDays size={14} /> MAREJESHO
                       </button>
                       <button
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
-                        onClick={() => setStatementLoan(row)}
+                        className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-900 bg-slate-900 px-3 py-1.5 text-[10px] font-black text-white hover:bg-slate-800 transition-all active:scale-95 shadow-sm"
+                        onClick={() => handleOpenDetails(row, 'statement')}
                       >
-                        <FileText size={12} /> Statement
+                        <FileText size={14} /> STATEMENT
                       </button>
                       <button
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
+                        className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 hover:bg-muted transition-all active:scale-95 shadow-sm"
                         onClick={() => setDocsLoan(row)}
                       >
-                        <Paperclip size={12} /> Documents
+                        <Paperclip size={14} /> DOCUMENTS
                       </button>
                       <button
                         className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
@@ -393,19 +399,19 @@ export function LoanTable({ loanType, rows, count }: Props) {
                         <td className="px-3 py-2">{row.memberPhone ?? '-'}</td>
                         <td className="px-3 py-2">
                           <button
-                            className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                            onClick={() => setSelectedLoanId(row.id)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-black text-primary hover:bg-primary hover:text-white transition-all active:scale-95 shadow-sm"
+                            onClick={() => handleOpenDetails(row, 'schedule')}
                           >
-                            <CalendarDays size={12} /> Marejesho
+                            <CalendarDays size={14} /> MAREJESHO
                           </button>
                         </td>
                         <td className="px-3 py-2 no-print">
                           <div className="flex gap-1">
                             <button
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                              onClick={() => setStatementLoan(row)}
+                              className="inline-flex items-center gap-2 rounded-lg border-2 border-slate-900 bg-slate-900 px-3 py-1 text-[10px] font-black text-white hover:bg-slate-800 transition-all active:scale-95 shadow-sm"
+                              onClick={() => handleOpenDetails(row, 'statement')}
                             >
-                              <FileText size={12} /> Statement
+                              <FileText size={14} /> STATEMENT
                             </button>
                             <button
                               className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
@@ -534,22 +540,22 @@ export function LoanTable({ loanType, rows, count }: Props) {
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
-                      className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                      onClick={() => setSelectedLoanId(row.id)}
+                      className="inline-flex items-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-1.5 text-[10px] font-black text-primary hover:bg-primary hover:text-white transition-all active:scale-95 shadow-sm"
+                      onClick={() => handleOpenDetails(row, 'schedule')}
                     >
-                      <CalendarDays size={12} /> Marejesho
+                      <CalendarDays size={14} /> MAREJESHO
                     </button>
                     <button
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
-                      onClick={() => setStatementLoan(row)}
+                      className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-900 bg-slate-900 px-3 py-1.5 text-[10px] font-black text-white hover:bg-slate-800 transition-all active:scale-95 shadow-sm"
+                      onClick={() => handleOpenDetails(row, 'statement')}
                     >
-                      <FileText size={12} /> Statement
+                      <FileText size={14} /> STATEMENT
                     </button>
                     <button
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-muted"
+                      className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 hover:bg-muted transition-all active:scale-95 shadow-sm"
                       onClick={() => setDocsLoan(row)}
                     >
-                      <Paperclip size={12} /> Documents
+                      <Paperclip size={14} /> DOCUMENTS
                     </button>
                     <button
                       className="rounded-md border px-2 py-1 text-xs hover:bg-muted"
@@ -626,20 +632,20 @@ export function LoanTable({ loanType, rows, count }: Props) {
                       </td>
                       <td className="px-3 py-2">
                         <button
-                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
-                          onClick={() => setSelectedLoanId(row.id)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-black text-primary hover:bg-primary hover:text-white transition-all active:scale-95 shadow-sm"
+                          onClick={() => handleOpenDetails(row, 'schedule')}
                         >
-                          <CalendarDays size={12} /> Marejesho
+                          <CalendarDays size={14} /> MAREJESHO
                         </button>
                       </td>
                       <td className="px-3 py-2 hidden md:table-cell capitalize">{row.status}</td>
                       <td className="px-3 py-2 no-print">
                         <div className="flex gap-1">
                           <button
-                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
-                            onClick={() => setStatementLoan(row)}
+                            className="inline-flex items-center gap-2 rounded-lg border-2 border-slate-900 bg-slate-900 px-3 py-1 text-[10px] font-black text-white hover:bg-slate-800 transition-all active:scale-95 shadow-sm"
+                            onClick={() => handleOpenDetails(row, 'statement')}
                           >
-                            <FileText size={12} /> Statement
+                            <FileText size={14} /> STATEMENT
                           </button>
                           <button
                             className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
@@ -720,19 +726,12 @@ export function LoanTable({ loanType, rows, count }: Props) {
         )}
       </div>
 
-      {selectedLoanId && (
-        <LoanSchedulesDialog
-          loanId={selectedLoanId}
+      {detailLoan ? (
+        <LoanDetailsDialog
+          loan={detailLoan}
           loanType={loanType}
-          repaymentFrequency={rows.find(r => r.id === selectedLoanId)?.repaymentFrequency}
-          onClose={() => setSelectedLoanId(null)}
-        />
-      )}
-
-      {statementLoan ? (
-        <LoanStatementDialog
-          loan={statementLoan}
-          onClose={() => setStatementLoan(null)}
+          initialTab={detailTab}
+          onClose={() => setDetailLoan(null)}
         />
       ) : null}
 
