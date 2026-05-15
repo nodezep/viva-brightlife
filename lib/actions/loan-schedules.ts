@@ -295,10 +295,10 @@ export async function regenerateLoanSchedulesAction(loanId: string) {
       return {error: loanError?.message || 'Loan not found'};
     }
 
-    // 1. Get existing paid schedules to preserve them
+    // 1. Get existing schedules to preserve/fix them
     const {data: existing} = await supabase
       .from('loan_schedules')
-      .select('week_number, status, paid_amount, expected_amount, expected_date')
+      .select('id, week_number, status, paid_amount, expected_amount, expected_date')
       .eq('loan_id', loanId)
       .order('week_number', {ascending: true});
 
@@ -311,23 +311,50 @@ export async function regenerateLoanSchedulesAction(loanId: string) {
 
     const remainingPeriods = Math.max(0, totalPeriods - paidSchedules.length);
     
-    if (remainingPeriods === 0 && paidSchedules.length > 0) {
-        // All periods are already paid, just delete pending/overdue ones
+    // Determine the correct start date and frequency for the schedule
+    const repaymentFrequency = loanRow.repayment_frequency || (isBinafsi ? 'monthly' : 'weekly');
+    const firstReturnDate =
+      loanRow.return_start_date && loanRow.return_start_date.trim()
+        ? loanRow.return_start_date
+        : (repaymentFrequency === 'monthly'
+          ? addMonthsToDateOnly(loanRow.disbursement_date, 1)
+          : addDaysToDateOnly(loanRow.disbursement_date, repaymentFrequency === 'daily' ? 1 : 7));
+
+    // 2. Fix dates of existing schedules if they are inconsistent
+    if (existing && firstReturnDate) {
+      for (const s of existing) {
+        let correctDate: string | null = null;
+        if (repaymentFrequency === 'monthly') {
+          correctDate = addMonthsToDateOnly(firstReturnDate, s.week_number - 1);
+        } else {
+          const daysToAdd = (s.week_number - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
+          correctDate = addDaysToDateOnly(firstReturnDate, daysToAdd);
+        }
+
+        if (correctDate && correctDate !== s.expected_date) {
+          // Update the date in the database
+          await supabase
+            .from('loan_schedules')
+            .update({ expected_date: correctDate })
+            .eq('id', s.id);
+          
+          // Update local copy for further calculations
+          s.expected_date = correctDate;
+        }
+      }
+    }
+
+    if (remainingPeriods === 0 && paidSchedules.length >= totalPeriods) {
+        // All periods are already paid, just delete any extra pending ones
         await supabase.from('loan_schedules').delete().eq('loan_id', loanId).neq('status', 'paid');
+        revalidatePath('/', 'layout');
         return {success: true};
     }
 
     let newSchedules: any[] = [];
     if (isBinafsi) {
       const totalRepay = Number(loanRow.weekly_installment ?? 0);
-      const repaymentFrequency = loanRow.repayment_frequency || 'monthly';
       const monthlyInstallment = totalRepay / totalPeriods;
-      const firstReturnDate =
-        loanRow.return_start_date && loanRow.return_start_date.trim()
-          ? loanRow.return_start_date
-          : (repaymentFrequency === 'monthly'
-            ? addMonthsToDateOnly(loanRow.disbursement_date, 1)
-            : addDaysToDateOnly(loanRow.disbursement_date, repaymentFrequency === 'daily' ? 1 : 7));
 
       for (let i = 1; i <= remainingPeriods; i++) {
         const weekNum = paidSchedules.length + i;
@@ -353,41 +380,37 @@ export async function regenerateLoanSchedulesAction(loanId: string) {
     } else {
       const installmentSize = Number(loanRow.weekly_installment ?? 0);
       const outstandingBalance = Number(loanRow.outstanding_balance ?? 0);
-      const repaymentFrequency = loanRow.repayment_frequency ?? 'weekly';
-      
-      const defaultStart = getDefaultReturnStartDate(loanRow.disbursement_date, repaymentFrequency);
-      const startDate =
-        loanRow.return_start_date && loanRow.return_start_date.trim()
-          ? loanRow.return_start_date
-          : defaultStart || loanRow.disbursement_date;
+      let remainingAmount = outstandingBalance;
 
-      const start = toUtcDate(startDate) ?? toUtcDate(loanRow.disbursement_date);
-      if (start) {
-          let currentDate = new Date(start);
-          const isDaily = repaymentFrequency === 'daily';
-          let remainingAmount = outstandingBalance;
+      for (let i = 1; i <= remainingPeriods; i++) {
+        const weekNum = paidSchedules.length + i;
+        let expectedDate: string | null = null;
+        
+        if (repaymentFrequency === 'monthly') {
+          expectedDate = addMonthsToDateOnly(firstReturnDate ?? loanRow.disbursement_date, weekNum - 1);
+        } else {
+          const daysToAdd = (weekNum - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
+          expectedDate = addDaysToDateOnly(firstReturnDate ?? loanRow.disbursement_date, daysToAdd);
+        }
 
-          for (let i = 1; i <= remainingPeriods; i++) {
-            const weekNum = paidSchedules.length + i;
-            if (i > 1) {
-              currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
-            }
-            const isLast = i === remainingPeriods;
-            let expectedAmount = isLast ? remainingAmount : Math.min(installmentSize, remainingAmount);
-            if (expectedAmount < 0) expectedAmount = 0;
-            remainingAmount -= expectedAmount;
-            
-            newSchedules.push({
-              loan_id: loanId,
-              week_number: weekNum,
-              expected_date: formatDateOnlyFromUtc(currentDate),
-              expected_amount: expectedAmount,
-              status: 'pending'
-            });
-          }
+        if (!expectedDate) continue;
+
+        const isLast = i === remainingPeriods;
+        let expectedAmount = isLast ? remainingAmount : Math.min(installmentSize, remainingAmount);
+        if (expectedAmount < 0) expectedAmount = 0;
+        remainingAmount -= expectedAmount;
+        
+        newSchedules.push({
+          loan_id: loanId,
+          week_number: weekNum,
+          expected_date: expectedDate,
+          expected_amount: expectedAmount,
+          status: 'pending'
+        });
       }
     }
 
+    // 3. Delete existing non-paid schedules and insert new ones
     const {error: deleteError} = await supabase
       .from('loan_schedules')
       .delete()
@@ -552,4 +575,26 @@ export async function markGroupSchedulesPaidAction(
     skippedInactive,
     errors
   };
+}
+
+export async function regenerateAllGroupsSchedulesAction() {
+  const supabase = createClient();
+  // We only target loans that are part of a group (group_id is not null)
+  // and are not binafsi (loan_type != 'binafsi')
+  const {data: loans, error} = await supabase
+    .from('loans')
+    .select('id')
+    .not('group_id', 'is', null)
+    .neq('loan_type', 'binafsi');
+
+  if (error || !loans) {
+    return {error: error?.message || 'Failed to load group loans'};
+  }
+
+  for (const loan of loans) {
+    await regenerateLoanSchedulesAction(loan.id);
+  }
+
+  revalidatePath('/', 'layout');
+  return {success: true};
 }

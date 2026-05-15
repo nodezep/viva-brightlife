@@ -8,6 +8,7 @@ import {
   formatDateOnlyFromUtc,
   toUtcDate
 } from '@/lib/date-only';
+import {regenerateLoanSchedulesAction} from './loan-schedules';
 
 const getDefaultReturnStartDate = (
   disbursementDate: string,
@@ -443,127 +444,8 @@ export async function updateLoanAction(formData: FormData) {
     return {error: updateError.message};
   }
 
-  const durationWeeksValue =
-    loanType === 'binafsi'
-      ? cycleCount
-      : computeDurationPeriods(outstandingBalance, installmentSize);
-
-  if (loanType !== 'binafsi' && durationWeeksValue > 0) {
-    const {error: deleteError} = await supabase
-      .from('loan_schedules')
-      .delete()
-      .eq('loan_id', loanId);
-
-    if (deleteError) {
-      return {error: deleteError.message};
-    }
-
-    const schedules = [];
-    let remainingAmount = outstandingBalance;
-    const defaultReturnStart = getDefaultReturnStartDate(
-      disbursementDate,
-      repaymentFrequency
-    );
-    const startDate =
-      returnStartDateRaw && returnStartDateRaw.trim()
-        ? returnStartDateRaw
-        : defaultReturnStart || disbursementDate;
-    const start = toUtcDate(startDate) ?? toUtcDate(disbursementDate);
-    if (!start) {
-      revalidatePath('/', 'layout');
-      return {success: true};
-    }
-    let currentDate = new Date(start);
-    const isDaily = repaymentFrequency === 'daily';
-    const isMonthly = repaymentFrequency === 'monthly';
-
-    for (let i = 1; i <= durationWeeksValue; i++) {
-      if (i > 1) {
-        if (isMonthly) {
-          const next = addMonthsToDateOnly(formatDateOnlyFromUtc(currentDate), 1);
-          if (next) {
-            currentDate = toUtcDate(next) ?? currentDate;
-          }
-        } else {
-          currentDate.setUTCDate(currentDate.getUTCDate() + (isDaily ? 1 : 7));
-        }
-      }
-      const isLastWeek = i === durationWeeksValue;
-      let expectedAmount = isLastWeek
-        ? remainingAmount
-        : Math.min(installmentSize, remainingAmount);
-      if (expectedAmount < 0) expectedAmount = 0;
-      remainingAmount -= expectedAmount;
-      schedules.push({
-        loan_id: loanId,
-        week_number: i,
-        expected_date: formatDateOnlyFromUtc(currentDate),
-        expected_amount: expectedAmount,
-        status: 'pending'
-      });
-    }
-
-    if (schedules.length > 0) {
-      const {error: scheduleError} = await supabase
-        .from('loan_schedules')
-        .insert(schedules);
-      if (scheduleError) {
-        return {error: scheduleError.message};
-      }
-    }
-  } else if (loanType === 'binafsi' && durationMonths > 0) {
-    const {error: deleteError} = await supabase
-      .from('loan_schedules')
-      .delete()
-      .eq('loan_id', loanId);
-
-    if (deleteError) {
-      return {error: deleteError.message};
-    }
-
-    // Generate schedules based on frequency
-    const schedules = [];
-    const periodInstallment = installmentSize / durationMonths;
-
-    const firstReturnDate =
-      returnStartDateRaw && returnStartDateRaw.trim()
-        ? returnStartDateRaw
-        : repaymentFrequency === 'monthly'
-        ? addMonthsToDateOnly(disbursementDate, 1)
-        : addDaysToDateOnly(disbursementDate, repaymentFrequency === 'daily' ? 1 : 7);
-
-    for (let i = 1; i <= durationMonths; i++) {
-      let expectedDate: string | null = null;
-      if (repaymentFrequency === 'monthly') {
-        expectedDate = i === 1
-          ? firstReturnDate
-          : addMonthsToDateOnly(firstReturnDate ?? disbursementDate, i - 1);
-      } else {
-        const daysToAdd = (i - 1) * (repaymentFrequency === 'daily' ? 1 : 7);
-        expectedDate = addDaysToDateOnly(firstReturnDate ?? disbursementDate, daysToAdd);
-      }
-
-      if (!expectedDate) continue;
-
-      schedules.push({
-        loan_id: loanId,
-        week_number: i,
-        expected_date: expectedDate,
-        expected_amount: periodInstallment,
-        status: 'pending'
-      });
-    }
-
-    if (schedules.length > 0) {
-      const {error: scheduleError} = await supabase
-        .from('loan_schedules')
-        .insert(schedules);
-
-      if (scheduleError) {
-        return {error: scheduleError.message};
-      }
-    }
-  }
+  // Use centralized logic to fix/regenerate schedules while preserving paid history
+  await regenerateLoanSchedulesAction(loanId);
 
   revalidatePath('/', 'layout');
   return {success: true};

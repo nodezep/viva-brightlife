@@ -1,11 +1,12 @@
 'use client';
 
-import {useState} from 'react';
-import {Plus, Trash2, Edit2, X} from 'lucide-react';
+import {useState, useTransition} from 'react';
+import {Plus, Trash2, Edit2, X, RotateCcw} from 'lucide-react';
 import {Link} from '@/lib/navigation';
 import type {GroupSummary} from '@/types';
 import {ConfirmDialog} from '@/components/ui/confirm-dialog';
 import {useProfile} from '@/lib/hooks/use-profile';
+import {regenerateAllGroupsSchedulesAction} from '@/lib/actions/loan-schedules';
 
 type Props = {
   initialGroups: GroupSummary[];
@@ -23,6 +24,20 @@ export function GroupsListModule({initialGroups}: Props) {
   const {profile} = useProfile();
   const [permissionError, setPermissionError] = useState('');
   const [editingGroup, setEditingGroup] = useState<GroupSummary | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleFixAll = () => {
+    if (!window.confirm('Are you sure you want to fix schedules for ALL groups? This will correct dates for everyone.')) return;
+    
+    startTransition(async () => {
+      const result = await regenerateAllGroupsSchedulesAction();
+      if (result.error) {
+        alert(result.error);
+      } else {
+        alert('All group schedules fixed successfully!');
+      }
+    });
+  };
 
   const clearForm = () => {
     setGroupName('');
@@ -138,7 +153,17 @@ export function GroupsListModule({initialGroups}: Props) {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-semibold">Mikopo ya Vikundi vya Wakina Mama</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Mikopo ya Vikundi vya Wakina Mama</h1>
+        <button
+          onClick={handleFixAll}
+          disabled={isPending}
+          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 hover:bg-rose-100 transition-all disabled:opacity-50"
+        >
+          <RotateCcw size={16} className={isPending ? 'animate-spin' : ''} /> 
+          FIX ALL GROUPS
+        </button>
+      </div>
 
       <form onSubmit={saveGroup} className="grid gap-4 rounded-xl border bg-card p-5 md:grid-cols-3">
         <div className="space-y-1">

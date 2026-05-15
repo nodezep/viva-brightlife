@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useMemo, useState} from 'react';
-import {ArrowLeft, Download, Plus, Printer, Trash2} from 'lucide-react';
+import {ArrowLeft, Download, Plus, Printer, Trash2, RotateCcw} from 'lucide-react';
 import {useRouter} from '@/lib/navigation';
 import type {GroupDetail, GroupMemberDetail} from '@/types';
 import type {LoanRecord} from '@/types';
@@ -928,6 +928,15 @@ export function GroupMembersModule({group, loans}: Props) {
                 disabled={printDates.length === 0 || !groupStartDate}
               >
                 <Download size={16} /> Download PDF
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-100 transition-all disabled:opacity-50"
+                onClick={() => void regenerateGroupSchedules()}
+                disabled={regenLoading || loans.length === 0}
+              >
+                <RotateCcw size={16} className={regenLoading ? 'animate-spin' : ''} /> 
+                FIX ALL SCHEDULES
               </button>
               <div className="flex items-center gap-2">
                 <input
